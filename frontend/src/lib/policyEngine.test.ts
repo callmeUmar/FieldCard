@@ -5,16 +5,17 @@ import {
   evaluateAgentRequest,
   evaluatePurchase,
 } from './policyEngine'
+import { JOB_MATERIAL_MCCS, MCC_HOME_IMPROVEMENT, MCC_PLUMBING_SUPPLY } from '../data/merchants'
 import type { Job, VirtualCard, Worker } from '../types'
 
 const job: Job = {
-  id: 'job-henderson',
+  id: 'job_henderson',
   code: 'HEN-1042',
   customerName: 'Henderson kitchen remodel',
   address: 'x',
   trade: 'plumbing',
   status: 'active',
-  assignedWorkerId: 'w-mike',
+  assignedWorkerId: 'w_mike',
   materialBudgetCents: 240_000,
   spentCents: 161_000,
   committedCents: 0,
@@ -22,7 +23,7 @@ const job: Job = {
 }
 
 const worker: Worker = {
-  id: 'w-mike',
+  id: 'w_mike',
   name: 'Mike',
   role: 'Lead',
   phone: 'x',
@@ -31,11 +32,11 @@ const worker: Worker = {
 
 const issuedAt = new Date('2026-06-01T10:00:00.000Z')
 const card: VirtualCard = {
-  id: 'card-live',
+  id: 'card_live',
   jobId: job.id,
   lastFour: '4821',
   spendLimitCents: 18_650,
-  merchantCategories: ['Plumbing Supply', 'Hardware'],
+  allowedMccs: [MCC_PLUMBING_SUPPLY],
   issuedAt: issuedAt.toISOString(),
   expiresAt: computeCardExpiresAt(issuedAt),
   status: 'active',
@@ -44,7 +45,7 @@ const card: VirtualCard = {
 
 describe('evaluateAgentRequest', () => {
   it('separates worker limit from requested amount', () => {
-    const rules = evaluateAgentRequest(job, worker, 18_650, 'Plumbing Supply')
+    const rules = evaluateAgentRequest(job, worker, 18_650, MCC_PLUMBING_SUPPLY)
     const workerRule = rules.find((r) => r.ruleId === 'r-worker-limit')
     expect(workerRule?.passed).toBe(true)
     expect(workerRule?.detail).toContain('$300.00')
@@ -58,7 +59,7 @@ describe('evaluatePurchase', () => {
       job,
       worker,
       merchant: 'Ferguson',
-      category: 'Plumbing Supply',
+      mcc: MCC_PLUMBING_SUPPLY,
       amountCents: 30_001,
       card,
     })
@@ -71,7 +72,7 @@ describe('evaluatePurchase', () => {
       job,
       worker,
       merchant: 'Ferguson',
-      category: 'Plumbing Supply',
+      mcc: MCC_PLUMBING_SUPPLY,
       amountCents: AUTO_APPROVE_THRESHOLD_CENTS + 1,
     })
     expect(result.status).toBe('pending')
@@ -82,7 +83,7 @@ describe('evaluatePurchase', () => {
       job,
       worker,
       merchant: 'Ferguson',
-      category: 'Plumbing Supply',
+      mcc: MCC_PLUMBING_SUPPLY,
       amountCents: 18_650,
       card,
     })
@@ -91,17 +92,19 @@ describe('evaluatePurchase', () => {
     expect(capRule?.detail).toContain('$186.50')
   })
 
-  it('declines blocked merchant without budget impact flag in summary', () => {
+  it('declines Home Depot via MCC 5200 not on allowed_mccs', () => {
     const result = evaluatePurchase({
       job,
       worker,
       merchant: 'Home Depot Pro',
-      category: 'General Retail',
+      mcc: MCC_HOME_IMPROVEMENT,
       amountCents: 8_900,
       card,
     })
     expect(result.approved).toBe(false)
-    expect(result.declineReason).toMatch(/category/i)
+    expect(result.declineReason).toContain('5200')
+    expect(result.declineReason).toContain('allowed_mccs')
+    expect(result.declineReason).not.toMatch(/home depot/i)
   })
 
   it('declines when single-use card already used', () => {
@@ -110,10 +113,16 @@ describe('evaluatePurchase', () => {
       job,
       worker,
       merchant: 'Ferguson',
-      category: 'Plumbing Supply',
+      mcc: MCC_PLUMBING_SUPPLY,
       amountCents: 18_650,
       card: usedCard,
     })
     expect(result.approved).toBe(false)
+  })
+})
+
+describe('JOB_MATERIAL_MCCS', () => {
+  it('excludes Home Improvement MCC 5200', () => {
+    expect(JOB_MATERIAL_MCCS).not.toContain(MCC_HOME_IMPROVEMENT)
   })
 })

@@ -44,7 +44,7 @@ export function TransactionRow({
           )}
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          {job?.customerName ?? 'Unknown job'} · {txn.category} ·{' '}
+          {job?.customerName ?? 'Unknown job'} · MCC {txn.mcc} ·{' '}
           {worker?.name ?? 'Field worker'} · •••• {txn.cardLastFour}
         </p>
         {txn.declineReason && (

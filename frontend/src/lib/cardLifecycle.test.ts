@@ -12,10 +12,10 @@ function baseCard(overrides: Partial<VirtualCard> = {}): VirtualCard {
   const issuedAt = new Date('2026-01-01T12:00:00.000Z')
   return {
     id: 'c1',
-    jobId: 'job-1',
+    jobId: 'job_1',
     lastFour: '1234',
     spendLimitCents: 18_650,
-    merchantCategories: ['Plumbing Supply'],
+    allowedMccs: ['5074'],
     issuedAt: issuedAt.toISOString(),
     expiresAt: computeCardExpiresAt(issuedAt),
     status: 'active',

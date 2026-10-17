@@ -51,7 +51,8 @@ export interface VirtualCard {
   jobId: string
   lastFour: string
   spendLimitCents: number
-  merchantCategories: string[]
+  /** Visa MCC codes — mirrors backend `allowed_mccs` */
+  allowedMccs: string[]
   issuedAt: string
   expiresAt: string
   status: 'active' | 'frozen' | 'expired' | 'used'
@@ -84,7 +85,7 @@ export interface Transaction {
   jobId: string
   workerId: string
   merchant: string
-  category: string
+  mcc: string
   amountCents: number
   status: TransactionStatus
   cardLastFour: string
@@ -115,10 +116,17 @@ export interface OverviewMetrics {
   spendVsLastMonthPercent: number
 }
 
+export interface Merchant {
+  id: string
+  name: string
+  mcc: string
+}
+
 export interface DashboardSnapshot {
   company: Company
   workers: Worker[]
   jobs: Job[]
+  merchants: Merchant[]
   cards: VirtualCard[]
   transactions: Transaction[]
   activities: ActivityItem[]
@@ -129,7 +137,7 @@ export interface DashboardSnapshot {
 export interface SimulatePurchaseInput {
   jobId: string
   merchant: string
-  category: string
+  mcc: string
   amountCents: number
   workerId?: string
 }

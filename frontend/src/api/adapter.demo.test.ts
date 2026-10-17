@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { initialSnapshot } from '../data/mockData'
+import { MCC_HOME_IMPROVEMENT } from '../data/merchants'
 import { PARSED_REQUEST } from '../demo/liveAgentScenario'
 import { CARD_VALIDITY_MS } from '../lib/cardLifecycle'
 import { DuplicatePurchaseError, fieldcardApi } from './adapter'
@@ -25,16 +26,26 @@ describe('fieldcardApi live demo financials', () => {
 
   it('updates HEN-1042 budget on approved purchase only', async () => {
     await fieldcardApi.recordLiveAgentSetup()
-    const before = (await fieldcardApi.getJob('job-henderson'))!
+    const before = (await fieldcardApi.getJob('job_henderson'))!
 
     await fieldcardApi.runLiveAgentPurchase('blocked')
-    const afterDecline = (await fieldcardApi.getJob('job-henderson'))!
+    const afterDecline = (await fieldcardApi.getJob('job_henderson'))!
     expect(afterDecline.spentCents).toBe(before.spentCents)
 
     await fieldcardApi.runLiveAgentPurchase('allowed')
-    const afterApprove = (await fieldcardApi.getJob('job-henderson'))!
+    const afterApprove = (await fieldcardApi.getJob('job_henderson'))!
     expect(afterApprove.spentCents).toBe(161_000 + 18_650)
     expect(afterApprove.materialBudgetCents - afterApprove.spentCents).toBe(60_350)
+  })
+
+  it('declines Home Depot using MCC restriction', async () => {
+    await fieldcardApi.recordLiveAgentSetup()
+    const result = await fieldcardApi.runLiveAgentPurchase('blocked')
+    expect(result.transaction.mcc).toBe(MCC_HOME_IMPROVEMENT)
+    expect(result.transaction.status).toBe('declined')
+    expect(result.transaction.declineReason).toContain('5200')
+    expect(result.transaction.declineReason).toContain('allowed_mccs')
+    expect(result.policyDecision.summary).toContain('5200')
   })
 
   it('marks single-use card used after approval', async () => {
@@ -57,12 +68,13 @@ describe('fieldcardApi live demo financials', () => {
     await fieldcardApi.runLiveAgentPurchase('allowed')
     await fieldcardApi.resetDemo()
 
-    const job = await fieldcardApi.getJob('job-henderson')
+    const job = await fieldcardApi.getJob('job_henderson')
     expect(job?.spentCents).toBe(initialSnapshot.jobs[0].spentCents)
     expect(fieldcardApi.getLiveDemoCard()).toBeUndefined()
 
     const snap = await fieldcardApi.getSnapshot()
-    const henCard = snap.cards.find((c) => c.id === 'card-hen')
+    const henCard = snap.cards.find((c) => c.id === 'card_hen')
     expect(henCard?.status).toBe('active')
+    expect(snap.workers[0].id).toBe('w_mike')
   })
 })

@@ -4,13 +4,13 @@ import { formatCurrencyPrecise, formatDateTime } from '../../lib/format'
 export function VirtualCardDisplay({
   lastFour,
   spendLimitCents,
-  categories,
+  allowedMccs,
   issuedAt,
   expiresAt,
 }: {
   lastFour: string
   spendLimitCents: number
-  categories: string[]
+  allowedMccs: string[]
   issuedAt: string
   expiresAt: string
 }) {
@@ -39,8 +39,8 @@ export function VirtualCardDisplay({
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">Categories</p>
-            <p className="mt-1 text-sm text-slate-200">{categories.join(', ')}</p>
+            <p className="text-[10px] uppercase tracking-wide text-slate-400">allowed_mccs</p>
+            <p className="mt-1 text-sm text-slate-200">{allowedMccs.join(', ')}</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wide text-slate-400">Issued</p>

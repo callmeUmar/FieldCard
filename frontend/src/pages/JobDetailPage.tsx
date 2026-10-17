@@ -105,7 +105,7 @@ export function JobDetailPage() {
             </p>
             <p className="sm:col-span-2">
               <span className="text-slate-400">Categories</span> ·{' '}
-              {card.merchantCategories.join(', ')}
+              {card.allowedMccs.join(', ')}
             </p>
           </div>
         </Card>

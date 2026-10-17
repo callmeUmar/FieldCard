@@ -10,6 +10,7 @@ import {
   PARSED_REQUEST,
 } from '../demo/liveAgentScenario'
 import { computeCardExpiresAt } from '../lib/cardLifecycle'
+import { toSimulatePurchaseResponse } from './contractAdapter'
 import {
   buildPurchaseNarrative,
   evaluatePurchase,
@@ -86,7 +87,7 @@ function issueLiveDemoCard(issuedAt: Date): VirtualCard {
     jobId: DEMO_JOB_ID,
     lastFour: DEMO_VIRTUAL_CARD.lastFour,
     spendLimitCents: PARSED_REQUEST.amountCents,
-    merchantCategories: [...DEMO_VIRTUAL_CARD.merchantCategories],
+    allowedMccs: [...DEMO_VIRTUAL_CARD.allowedMccs],
     issuedAt: issuedAt.toISOString(),
     expiresAt: computeCardExpiresAt(issuedAt),
     status: 'active',
@@ -119,10 +120,15 @@ function applyPurchaseToSnapshot(
     job,
     worker,
     merchant: input.merchant,
-    category: input.category,
+    mcc: input.mcc,
     amountCents: input.amountCents,
     card,
   })
+
+  const cardProviderResult = toSimulatePurchaseResponse(evaluation)
+  if (cardProviderResult.result === 'declined' && evaluation.approved) {
+    throw new Error('Policy evaluation mismatch with card provider contract')
+  }
 
   const txnId = uid('txn')
   const polId = uid('pol')
@@ -141,7 +147,7 @@ function applyPurchaseToSnapshot(
     jobId: input.jobId,
     workerId: worker.id,
     merchant: input.merchant,
-    category: input.category,
+    mcc: input.mcc,
     amountCents: input.amountCents,
     status,
     cardLastFour: card?.lastFour ?? '0000',
@@ -388,7 +394,7 @@ export const fieldcardApi = {
           jobId: DEMO_JOB_ID,
           workerId: DEMO_WORKER_ID,
           merchant: purchase.merchant,
-          category: purchase.category,
+          mcc: purchase.mcc,
           amountCents: purchase.amountCents,
         },
         { isSimulated: true, source: 'live-demo' },

@@ -43,15 +43,15 @@ export function LiveAgentDemoPage() {
   const [result, setResult] = useState<SimulatePurchaseResult | null>(null)
   const policyAnimStarted = useRef(false)
 
-  const job = data?.jobs.find((j) => j.id === 'job-henderson')
-  const worker = data?.workers.find((w) => w.id === 'w-mike')
+  const job = data?.jobs.find((j) => j.id === 'job_henderson')
+  const worker = data?.workers.find((w) => w.id === 'w_mike')
 
   const policyRules = useMemo(() => {
     return evaluateAgentRequest(
       job,
       worker,
       PARSED_REQUEST.amountCents,
-      PARSED_REQUEST.category,
+      PARSED_REQUEST.mcc,
     )
   }, [job, worker])
 
@@ -216,7 +216,7 @@ export function LiveAgentDemoPage() {
                     ? formatCurrencyPrecise(worker.spendingLimitCents)
                     : '—',
                 ],
-                ['Category', PARSED_REQUEST.category],
+                ['MCC', PARSED_REQUEST.mcc],
               ].map(([label, value]) => (
                 <div
                   key={label}
@@ -267,7 +267,7 @@ export function LiveAgentDemoPage() {
             <VirtualCardDisplay
               lastFour={issuedDemoCard.lastFour}
               spendLimitCents={issuedDemoCard.spendLimitCents}
-              categories={issuedDemoCard.merchantCategories}
+              allowedMccs={issuedDemoCard.allowedMccs}
               issuedAt={issuedDemoCard.issuedAt}
               expiresAt={issuedDemoCard.expiresAt}
             />

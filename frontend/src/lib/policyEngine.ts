@@ -1,21 +1,16 @@
+import { mccDeclineReason } from '../data/merchants'
 import { cardDeclineReason, isCardSpendable } from './cardLifecycle'
+import { evaluateMccForCard } from './mccPolicy'
 import type { Job, PolicyRuleHit, VirtualCard, Worker } from '../types'
 
-export const BLOCKED_CATEGORIES = new Set([
-  'General Retail',
-  'Online Marketplace',
-  'Restaurant',
-  'Fuel',
-])
-
-/** Single-transaction auto-approve ceiling (USD) */
+/** Mirrors company `approval_threshold_usd` ($250) in mock data */
 export const AUTO_APPROVE_THRESHOLD_CENTS = 25_000
 
 export interface PurchaseEvaluationInput {
   job: Job
   worker: Worker
   merchant: string
-  category: string
+  mcc: string
   amountCents: number
   card?: VirtualCard
   nowMs?: number
@@ -40,7 +35,7 @@ export function evaluateAgentRequest(
   job: Job | undefined,
   worker: Worker | undefined,
   amountCents: number,
-  category: string,
+  mcc: string,
 ): PolicyRuleHit[] {
   const rules: PolicyRuleHit[] = []
 
@@ -77,17 +72,13 @@ export function evaluateAgentRequest(
       : 'Budget unavailable',
   })
 
-  const categoryPass =
-    !BLOCKED_CATEGORIES.has(category) &&
-    (category === 'Plumbing Supply' || category === 'Hardware')
+  const mccEval = evaluateMccForCard(mcc, undefined)
   rules.push({
     ruleId: 'r-mcc',
-    title: 'Merchant category',
-    description: 'Materials must be plumbing or hardware suppliers',
-    passed: categoryPass,
-    detail: categoryPass
-      ? `${category} is allowed for this job`
-      : `${category} is not on the allowlist`,
+    title: 'Merchant category (MCC)',
+    description: 'Request MCC must be allowed for job materials',
+    passed: mccEval.passed,
+    detail: mccEval.detail,
   })
 
   rules.push({
@@ -98,7 +89,7 @@ export function evaluateAgentRequest(
     detail:
       amountCents <= AUTO_APPROVE_THRESHOLD_CENTS
         ? 'Within auto-approve range'
-        : `${formatUsd(amountCents)} requires Dana to approve`,
+        : `${formatUsd(amountCents)} requires owner approval`,
   })
 
   return rules
@@ -111,8 +102,7 @@ export function agentRequestApproved(rules: PolicyRuleHit[]): boolean {
 export function evaluatePurchase(
   input: PurchaseEvaluationInput,
 ): PurchaseEvaluation {
-  const { job, worker, amountCents, category, card, nowMs = Date.now() } = input
-  const cardCategories = card?.merchantCategories ?? []
+  const { job, worker, amountCents, mcc, card, nowMs = Date.now() } = input
   const rules: PolicyRuleHit[] = []
 
   rules.push({
@@ -143,17 +133,14 @@ export function evaluatePurchase(
       : `Over budget by ${formatUsd(amountCents - remaining)}`,
   })
 
-  const categoryPass =
-    !BLOCKED_CATEGORIES.has(category) &&
-    (cardCategories.length === 0 || cardCategories.includes(category))
+  const mccEval = evaluateMccForCard(mcc, card)
+  const mccPass = mccEval.passed
   rules.push({
     ruleId: 'r-mcc',
-    title: 'Merchant category',
-    description: 'Merchant must match virtual card category restrictions',
-    passed: categoryPass,
-    detail: categoryPass
-      ? `${category} is allowed on this card`
-      : `${category} is blocked for this job card`,
+    title: 'Merchant category (MCC)',
+    description: 'MCC must be listed on the virtual card allowed_mccs',
+    passed: mccPass,
+    detail: mccEval.detail,
   })
 
   const needsReview = amountCents > AUTO_APPROVE_THRESHOLD_CENTS
@@ -198,8 +185,10 @@ export function evaluatePurchase(
 
   if (hardFail) {
     const cardReason = card ? cardDeclineReason(card, amountCents, nowMs) : undefined
-    const declineReason = !categoryPass
-      ? 'Merchant category not on job card allowlist'
+    const declineReason = !mccPass
+      ? card
+        ? mccDeclineReason(mcc, card.allowedMccs)
+        : mccEval.detail
       : cardReason
         ? cardReason
         : !budgetPass
@@ -245,5 +234,5 @@ export function buildPurchaseNarrative(
   if (!approved) {
     return `Purchase at ${merchant} for ${jobName} was blocked by company policy. ${label}`
   }
-  return `Purchase at ${merchant} for ${jobName} fits job budget, worker limits, and merchant rules. ${label}`
+  return `Purchase at ${merchant} for ${jobName} fits job budget, worker limits, and card MCC rules. ${label}`
 }

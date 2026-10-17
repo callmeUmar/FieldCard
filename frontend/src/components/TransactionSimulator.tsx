@@ -1,42 +1,37 @@
 import { CheckCircle2, Loader2, Sparkles, XCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { MERCHANTS } from '../data/merchants'
 import { formatCurrencyPrecise } from '../lib/format'
 import type { Job, SimulatePurchaseResult } from '../types'
 import { useDashboard } from '../context/DashboardContext'
 import { Button } from './ui/Button'
 import { Card, CardHeader } from './ui/Card'
 
+const ferguson = MERCHANTS.find((m) => m._id === 'merchant_ferguson')!
+const homeDepot = MERCHANTS.find((m) => m._id === 'merchant_home_depot')!
+
 const PRESETS = [
   {
     label: 'PEX (approve)',
-    merchant: 'Ferguson Plumbing Supply',
-    category: 'Plumbing Supply',
+    merchant: ferguson.name,
+    mcc: ferguson.mcc,
     amountCents: 18_650,
-    jobId: 'job-henderson',
+    jobId: 'job_henderson',
   },
   {
     label: 'Home Depot (decline)',
-    merchant: 'Home Depot Pro',
-    category: 'General Retail',
+    merchant: homeDepot.name,
+    mcc: homeDepot.mcc,
     amountCents: 8_900,
-    jobId: 'job-henderson',
+    jobId: 'job_henderson',
   },
   {
     label: 'Over $250 (pending)',
-    merchant: 'Ferguson Plumbing Supply',
-    category: 'Plumbing Supply',
+    merchant: ferguson.name,
+    mcc: ferguson.mcc,
     amountCents: 27_500,
-    jobId: 'job-henderson',
+    jobId: 'job_henderson',
   },
-]
-
-const CATEGORIES = [
-  'Plumbing Supply',
-  'HVAC Supply',
-  'Electrical Supply',
-  'Hardware',
-  'General Retail',
-  'Online Marketplace',
 ]
 
 export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
@@ -47,8 +42,8 @@ export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
   )
 
   const [jobId, setJobId] = useState(activeJobs[0]?.id ?? '')
-  const [merchant, setMerchant] = useState('Ferguson Plumbing Supply')
-  const [category, setCategory] = useState('Plumbing Supply')
+  const [merchant, setMerchant] = useState(ferguson.name)
+  const [mcc, setMcc] = useState(ferguson.mcc)
   const [amount, setAmount] = useState('125.00')
   const [lastResult, setLastResult] = useState<SimulatePurchaseResult | null>(null)
 
@@ -57,14 +52,14 @@ export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
   const applyPreset = (preset: (typeof PRESETS)[number]) => {
     setJobId(preset.jobId)
     setMerchant(preset.merchant)
-    setCategory(preset.category)
+    setMcc(preset.mcc)
     setAmount((preset.amountCents / 100).toFixed(2))
   }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!jobId || amountCents <= 0) return
-    const result = await simulate({ jobId, merchant, category, amountCents })
+    const result = await simulate({ jobId, merchant, mcc, amountCents })
     if (result) setLastResult(result)
   }
 
@@ -101,7 +96,7 @@ export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
               </p>
               <p className="mt-1 text-sm text-slate-700">
                 {formatCurrencyPrecise(lastResult.transaction.amountCents)} at{' '}
-                {lastResult.transaction.merchant}
+                {lastResult.transaction.merchant} (MCC {lastResult.transaction.mcc})
               </p>
               <p className="mt-2 text-sm font-medium text-slate-800">
                 {lastResult.policyDecision.summary}
@@ -114,7 +109,7 @@ export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
       <Card>
         <CardHeader
           title="Transaction simulator"
-          description="Local policy engine with simulated results — swap in the real API via the adapter when ready."
+          description="Local policy engine with simulated results — aligned with CardProvider.simulate_purchase."
           action={
             <Sparkles className="h-5 w-5 text-violet-500" strokeWidth={1.75} />
           }
@@ -164,23 +159,27 @@ export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
             </label>
             <label className="block text-sm sm:col-span-2">
               <span className="font-medium text-slate-700">Merchant</span>
-              <input
-                value={merchant}
-                onChange={(e) => setMerchant(e.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              <span className="font-medium text-slate-700">Category</span>
               <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                value={merchant}
+                onChange={(e) => {
+                  const m = MERCHANTS.find((x) => x.name === e.target.value)
+                  setMerchant(e.target.value)
+                  if (m) setMcc(m.mcc)
+                }}
                 className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                {MERCHANTS.map((m) => (
+                  <option key={m._id} value={m.name}>{m.name}</option>
                 ))}
               </select>
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <span className="font-medium text-slate-700">MCC</span>
+              <input
+                value={mcc}
+                readOnly
+                className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm tabular-nums"
+              />
             </label>
           </div>
 
