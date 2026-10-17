@@ -49,3 +49,10 @@ Database: `fieldcard`. All `_id` values are strings (e.g. `job_henderson`). All 
 | `receipts` | `_id`, `transaction_id`, `job_id`, `store`, `items[]`, `total`, `flags[]`, `ocr_source` |
 | `intent_receipts` | `_id`, `request_id`, `original_text`, `interpretation`, `policy`, `approvals[]`, `card_rules`, `transaction_ids[]`, `hash` |
 | `activity` | `_id`, `at`, `kind`, `message`, `job_id` |
+
+## Vision (`vision.py`)
+
+```python
+read_receipt(image_url: str, planned_materials: list) -> dict
+```
+Returns `{"store": str, "items": list, "total": float, "flags": list, "ocr_source": str}`. `flags` lists items that are not in `planned_materials`.
