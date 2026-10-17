@@ -6,8 +6,10 @@ import {
   DEMO_VIRTUAL_CARD,
   DEMO_WORKER_ID,
   LIVE_AGENT_SMS,
+  LIVE_DEMO_CARD_ID,
   PARSED_REQUEST,
 } from '../demo/liveAgentScenario'
+import { computeCardExpiresAt } from '../lib/cardLifecycle'
 import {
   buildPurchaseNarrative,
   evaluatePurchase,
@@ -20,12 +22,37 @@ import type {
   SimulatePurchaseInput,
   SimulatePurchaseResult,
   Transaction,
+  VirtualCard,
 } from '../types'
 
 /** Simulated network latency for demo realism */
-const delay = (ms = 420) => new Promise((r) => setTimeout(r, ms))
+const delay = (ms = 420) =>
+  import.meta.env.VITEST
+    ? Promise.resolve()
+    : new Promise((r) => setTimeout(r, ms))
 
 let snapshot: DashboardSnapshot = structuredClone(initialSnapshot)
+
+interface LiveDemoSession {
+  setupRecorded: boolean
+  issuedCardId: string | null
+  purchaseInFlight: boolean
+  allowedPurchaseSettled: boolean
+}
+
+const liveDemoSession: LiveDemoSession = {
+  setupRecorded: false,
+  issuedCardId: null,
+  purchaseInFlight: false,
+  allowedPurchaseSettled: false,
+}
+
+function resetLiveDemoSession(): void {
+  liveDemoSession.setupRecorded = false
+  liveDemoSession.issuedCardId = null
+  liveDemoSession.purchaseInFlight = false
+  liveDemoSession.allowedPurchaseSettled = false
+}
 
 function uid(prefix: string): string {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
@@ -38,6 +65,44 @@ function getWorkerAndJob(jobId: string, workerId: string) {
   return { job, worker }
 }
 
+function resolveCardForPurchase(jobId: string): VirtualCard | undefined {
+  if (liveDemoSession.issuedCardId) {
+    const live = snapshot.cards.find((c) => c.id === liveDemoSession.issuedCardId)
+    if (live && live.jobId === jobId) return live
+  }
+  return snapshot.cards.find((c) => c.jobId === jobId && c.status === 'active')
+}
+
+function issueLiveDemoCard(issuedAt: Date): VirtualCard {
+  for (const c of snapshot.cards) {
+    if (c.jobId === DEMO_JOB_ID && c.status === 'active') {
+      c.status = 'frozen'
+    }
+  }
+
+  const existing = snapshot.cards.find((c) => c.id === LIVE_DEMO_CARD_ID)
+  const card: VirtualCard = {
+    id: LIVE_DEMO_CARD_ID,
+    jobId: DEMO_JOB_ID,
+    lastFour: DEMO_VIRTUAL_CARD.lastFour,
+    spendLimitCents: PARSED_REQUEST.amountCents,
+    merchantCategories: [...DEMO_VIRTUAL_CARD.merchantCategories],
+    issuedAt: issuedAt.toISOString(),
+    expiresAt: computeCardExpiresAt(issuedAt),
+    status: 'active',
+    singleUse: true,
+  }
+
+  if (existing) {
+    Object.assign(existing, card)
+  } else {
+    snapshot.cards.push(card)
+  }
+
+  liveDemoSession.issuedCardId = card.id
+  return card
+}
+
 function applyPurchaseToSnapshot(
   input: SimulatePurchaseInput,
   options: { isSimulated: boolean; source: 'simulator' | 'live-demo' },
@@ -45,10 +110,10 @@ function applyPurchaseToSnapshot(
   const jobRef = snapshot.jobs.find((j) => j.id === input.jobId)
   const workerId = input.workerId ?? jobRef?.assignedWorkerId
   if (!jobRef || !workerId) throw new Error('Job or worker not found')
+
+  const spentBefore = jobRef.spentCents
   const { job, worker } = getWorkerAndJob(input.jobId, workerId)
-  const card = snapshot.cards.find(
-    (c) => c.jobId === input.jobId && c.status === 'active',
-  )
+  const card = resolveCardForPurchase(input.jobId)
 
   const evaluation = evaluatePurchase({
     job,
@@ -56,8 +121,7 @@ function applyPurchaseToSnapshot(
     merchant: input.merchant,
     category: input.category,
     amountCents: input.amountCents,
-    cardCategories: card?.merchantCategories ?? [],
-    cardSpendLimitCents: card?.spendLimitCents,
+    card,
   })
 
   const txnId = uid('txn')
@@ -93,7 +157,6 @@ function applyPurchaseToSnapshot(
     jobId: input.jobId,
     approved: evaluation.approved,
     summary: evaluation.summary,
-    confidence: evaluation.approved ? 0.94 : 0.92,
     evaluatedAt: new Date().toISOString(),
     rules: evaluation.rules,
     aiNarrative: buildPurchaseNarrative(
@@ -107,8 +170,15 @@ function applyPurchaseToSnapshot(
   if (evaluation.approved) {
     job.spentCents += input.amountCents
     snapshot.metrics.totalMaterialSpendCents += input.amountCents
+    if (card?.singleUse) {
+      card.status = 'used'
+    }
   } else if (evaluation.status === 'pending') {
     snapshot.metrics.pendingApprovals += 1
+  }
+
+  if (!evaluation.approved && job.spentCents !== spentBefore) {
+    throw new Error('Declined purchase must not change job spend')
   }
 
   snapshot.transactions.unshift(transaction)
@@ -117,7 +187,7 @@ function applyPurchaseToSnapshot(
   const simTag = options.isSimulated ? ' [SIMULATION]' : ''
   const activity = {
     id: uid('act'),
-    type: options.source === 'live-demo' ? ('simulation' as const) : ('simulation' as const),
+    type: 'simulation' as const,
     title: evaluation.approved
       ? options.source === 'live-demo'
         ? 'Live Agent Demo — purchase approved'
@@ -138,6 +208,13 @@ function applyPurchaseToSnapshot(
   return { transaction, policyDecision, activity }
 }
 
+export class DuplicatePurchaseError extends Error {
+  constructor(message = 'Purchase already in progress or completed') {
+    super(message)
+    this.name = 'DuplicatePurchaseError'
+  }
+}
+
 export const fieldcardApi = {
   async getSnapshot(): Promise<DashboardSnapshot> {
     await delay(180)
@@ -154,14 +231,26 @@ export const fieldcardApi = {
     return snapshot.policyDecisions.find((p) => p.id === id)
   },
 
+  getLiveDemoCard(): VirtualCard | undefined {
+    if (!liveDemoSession.issuedCardId) return undefined
+    return snapshot.cards.find((c) => c.id === liveDemoSession.issuedCardId)
+  },
+
   async approveTransaction(transactionId: string): Promise<Transaction | undefined> {
     await delay(300)
     const txn = snapshot.transactions.find((t) => t.id === transactionId)
     if (!txn || txn.status !== 'pending') return undefined
 
-    txn.status = 'approved'
     const job = snapshot.jobs.find((j) => j.id === txn.jobId)
-    if (job) job.spentCents += txn.amountCents
+    if (!job) return undefined
+
+    const spentBefore = job.spentCents
+    txn.status = 'approved'
+    job.spentCents += txn.amountCents
+
+    if (job.spentCents <= spentBefore) {
+      throw new Error('Approval must increase job spend')
+    }
 
     const pol = snapshot.policyDecisions.find((p) => p.transactionId === transactionId)
     if (pol) {
@@ -178,7 +267,7 @@ export const fieldcardApi = {
       id: uid('act'),
       type: 'purchase',
       title: 'Owner approved purchase',
-      description: `${txn.merchant} — ${formatUsd(txn.amountCents)} on ${job?.customerName ?? 'job'}`,
+      description: `${txn.merchant} — ${formatUsd(txn.amountCents)} on ${job.customerName}`,
       timestamp: new Date().toISOString(),
       jobId: txn.jobId,
       transactionId: txn.id,
@@ -197,10 +286,15 @@ export const fieldcardApi = {
     const txn = snapshot.transactions.find((t) => t.id === transactionId)
     if (!txn || txn.status !== 'pending') return undefined
 
+    const job = snapshot.jobs.find((j) => j.id === txn.jobId)
+    const spentBefore = job?.spentCents ?? 0
     txn.status = 'declined'
     txn.declineReason = 'Declined by owner via dashboard'
 
-    const job = snapshot.jobs.find((j) => j.id === txn.jobId)
+    if (job && job.spentCents !== spentBefore) {
+      throw new Error('Declined purchase must not change job spend')
+    }
+
     snapshot.activities.unshift({
       id: uid('act'),
       type: 'purchase',
@@ -227,62 +321,106 @@ export const fieldcardApi = {
     })
   },
 
-  /** Record SMS + card issuance from the Live Agent Demo (deterministic) */
-  async recordLiveAgentSetup(): Promise<void> {
+  async recordLiveAgentSetup(): Promise<VirtualCard> {
     await delay(500)
     const job = snapshot.jobs.find((j) => j.id === DEMO_JOB_ID)
-    if (!job) return
+    if (!job) throw new Error('Demo job not found')
 
-    snapshot.activities.unshift(
-      {
-        id: uid('act'),
-        type: 'sms',
-        title: 'Live Agent Demo — inbound SMS',
-        description: LIVE_AGENT_SMS,
-        timestamp: new Date().toISOString(),
-        jobId: DEMO_JOB_ID,
-        meta: { simulated: 'true', source: 'live-demo' },
-      },
-      {
-        id: uid('act'),
-        type: 'card_issued',
-        title: 'Live Agent Demo — sandbox card issued',
-        description: `Card •••• ${DEMO_VIRTUAL_CARD.lastFour} — ${formatUsd(DEMO_VIRTUAL_CARD.spendLimitCents)} cap for ${PARSED_REQUEST.jobCode}`,
-        timestamp: new Date().toISOString(),
-        jobId: DEMO_JOB_ID,
-        meta: { simulated: 'true', source: 'live-demo' },
-      },
-      {
-        id: uid('act'),
-        type: 'policy_check',
-        title: 'Live Agent Demo — policy passed',
-        description: `Agent approved ${formatUsd(PARSED_REQUEST.amountCents)} ${PARSED_REQUEST.materials} for ${PARSED_REQUEST.jobLabel}`,
-        timestamp: new Date().toISOString(),
-        jobId: DEMO_JOB_ID,
-        meta: { simulated: 'true', source: 'live-demo' },
-      },
-    )
+    const issuedAt = new Date()
+    const card = issueLiveDemoCard(issuedAt)
+
+    if (!liveDemoSession.setupRecorded) {
+      snapshot.activities.unshift(
+        {
+          id: uid('act'),
+          type: 'sms',
+          title: 'Live Agent Demo — inbound SMS',
+          description: LIVE_AGENT_SMS,
+          timestamp: issuedAt.toISOString(),
+          jobId: DEMO_JOB_ID,
+          meta: { simulated: 'true', source: 'live-demo' },
+        },
+        {
+          id: uid('act'),
+          type: 'card_issued',
+          title: 'Live Agent Demo — sandbox card issued',
+          description: `Card •••• ${card.lastFour} — ${formatUsd(card.spendLimitCents)} cap (approved request) for ${PARSED_REQUEST.jobCode}`,
+          timestamp: issuedAt.toISOString(),
+          jobId: DEMO_JOB_ID,
+          meta: { simulated: 'true', source: 'live-demo' },
+        },
+        {
+          id: uid('act'),
+          type: 'policy_check',
+          title: 'Live Agent Demo — policy passed',
+          description: `Deterministic policy approved ${formatUsd(PARSED_REQUEST.amountCents)} for ${PARSED_REQUEST.jobLabel}`,
+          timestamp: issuedAt.toISOString(),
+          jobId: DEMO_JOB_ID,
+          meta: { simulated: 'true', source: 'live-demo' },
+        },
+      )
+      liveDemoSession.setupRecorded = true
+    }
+
+    return structuredClone(card)
   },
 
   async runLiveAgentPurchase(
     variant: 'allowed' | 'blocked',
   ): Promise<SimulatePurchaseResult> {
+    if (liveDemoSession.purchaseInFlight) {
+      throw new DuplicatePurchaseError('A purchase is already being processed')
+    }
+    if (variant === 'allowed' && liveDemoSession.allowedPurchaseSettled) {
+      throw new DuplicatePurchaseError('This single-use card has already been used')
+    }
+    if (!liveDemoSession.issuedCardId) {
+      throw new Error('Issue the sandbox card before simulating a purchase')
+    }
+
+    liveDemoSession.purchaseInFlight = true
     await delay(700)
-    const purchase = variant === 'allowed' ? ALLOWED_PURCHASE : BLOCKED_PURCHASE
-    return applyPurchaseToSnapshot(
-      {
-        jobId: DEMO_JOB_ID,
-        workerId: DEMO_WORKER_ID,
-        merchant: purchase.merchant,
-        category: purchase.category,
-        amountCents: purchase.amountCents,
-      },
-      { isSimulated: true, source: 'live-demo' },
-    )
+
+    try {
+      const purchase = variant === 'allowed' ? ALLOWED_PURCHASE : BLOCKED_PURCHASE
+      const result = applyPurchaseToSnapshot(
+        {
+          jobId: DEMO_JOB_ID,
+          workerId: DEMO_WORKER_ID,
+          merchant: purchase.merchant,
+          category: purchase.category,
+          amountCents: purchase.amountCents,
+        },
+        { isSimulated: true, source: 'live-demo' },
+      )
+
+      if (
+        variant === 'allowed' &&
+        (result.transaction.status === 'simulated' ||
+          result.transaction.status === 'approved')
+      ) {
+        liveDemoSession.allowedPurchaseSettled = true
+      }
+
+      return result
+    } finally {
+      liveDemoSession.purchaseInFlight = false
+    }
   },
 
   async resetDemo(): Promise<void> {
     await delay(200)
     snapshot = structuredClone(initialSnapshot)
+    resetLiveDemoSession()
+  },
+
+  /** @internal test hook */
+  _setSnapshotForTests(next: DashboardSnapshot): void {
+    snapshot = structuredClone(next)
+    resetLiveDemoSession()
+  },
+
+  _getSnapshotMutableForTests(): DashboardSnapshot {
+    return snapshot
   },
 }

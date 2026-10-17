@@ -96,7 +96,8 @@ export const initialSnapshot: DashboardSnapshot = {
       lastFour: '4821',
       spendLimitCents: 30_000,
       merchantCategories: ['Plumbing Supply', 'Hardware'],
-      expiresAt: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      issuedAt: hoursAgo(1),
+      expiresAt: new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString(),
       status: 'active',
     },
     {
@@ -105,7 +106,8 @@ export const initialSnapshot: DashboardSnapshot = {
       lastFour: '9034',
       spendLimitCents: 20_000,
       merchantCategories: ['Plumbing Supply', 'Hardware'],
-      expiresAt: new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+      issuedAt: hoursAgo(2),
+      expiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
       status: 'active',
     },
     {
@@ -114,7 +116,8 @@ export const initialSnapshot: DashboardSnapshot = {
       lastFour: '7712',
       spendLimitCents: 15_000,
       merchantCategories: ['Plumbing Supply', 'Hardware'],
-      expiresAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      issuedAt: hoursAgo(0.5),
+      expiresAt: new Date(now.getTime() + 3.5 * 60 * 60 * 1000).toISOString(),
       status: 'active',
     },
   ],
@@ -268,7 +271,6 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job-henderson',
       approved: true,
       summary: 'Within job budget and approved merchant category',
-      confidence: 0.97,
       evaluatedAt: hoursAgo(2),
       rules: [
         {
@@ -295,7 +297,6 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job-ortega',
       approved: true,
       summary: 'Water heater materials within tight budget',
-      confidence: 0.93,
       evaluatedAt: hoursAgo(5),
       rules: [
         {
@@ -322,7 +323,6 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job-chen',
       approved: true,
       summary: 'Rough-in materials approved',
-      confidence: 0.96,
       evaluatedAt: hoursAgo(8),
       rules: [
         {
@@ -349,7 +349,6 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job-henderson',
       approved: false,
       summary: 'Declined — merchant category not allowed on this card',
-      confidence: 0.99,
       evaluatedAt: hoursAgo(26),
       rules: [
         {
@@ -369,7 +368,6 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job-henderson',
       approved: false,
       summary: 'Pending — over $250 auto-approve threshold',
-      confidence: 0.9,
       evaluatedAt: hoursAgo(0.5),
       rules: [
         {
@@ -395,7 +393,6 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job-chen',
       approved: false,
       summary: 'Declined — online marketplace blocked',
-      confidence: 0.98,
       evaluatedAt: hoursAgo(30),
       rules: [
         {

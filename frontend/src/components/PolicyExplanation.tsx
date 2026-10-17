@@ -1,5 +1,5 @@
-import { Bot, CheckCircle2, XCircle } from 'lucide-react'
-import { formatDateTime, formatPercent } from '../lib/format'
+import { Bot, CheckCircle2, Shield, XCircle } from 'lucide-react'
+import { formatDateTime } from '../lib/format'
 import type { PolicyDecision } from '../types'
 import { Badge } from './ui/Badge'
 import { Card } from './ui/Card'
@@ -10,19 +10,20 @@ export function PolicyExplanation({ decision }: { decision: PolicyDecision }) {
       <Card className="overflow-hidden">
         <div className="border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white px-6 py-5">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
-              <Bot className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-white">
+              <Shield className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">AI policy decision</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                Authorization result
+              </h2>
               <p className="text-sm text-slate-500">
-                Evaluated {formatDateTime(decision.evaluatedAt)} ·{' '}
-                {formatPercent(decision.confidence * 100, 0)} confidence
+                Evaluated {formatDateTime(decision.evaluatedAt)}
               </p>
             </div>
             <div className="ml-auto">
               <Badge variant={decision.approved ? 'success' : 'danger'}>
-                {decision.approved ? 'Approved' : 'Not approved'}
+                {decision.approved ? 'Authorized' : 'Not authorized'}
               </Badge>
             </div>
           </div>
@@ -30,8 +31,11 @@ export function PolicyExplanation({ decision }: { decision: PolicyDecision }) {
         </div>
         <div className="px-6 py-5">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Rule evaluation
+            Deterministic policy evaluation
           </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Rule engine only — not a probabilistic model score.
+          </p>
           <ul className="mt-4 space-y-3">
             {decision.rules.map((rule) => (
               <li
@@ -57,7 +61,16 @@ export function PolicyExplanation({ decision }: { decision: PolicyDecision }) {
       </Card>
 
       <Card className="p-6">
-        <h3 className="text-sm font-semibold text-slate-900">Agent explanation</h3>
+        <div className="flex items-center gap-2">
+          <Bot className="h-4 w-4 text-indigo-600" />
+          <h3 className="text-sm font-semibold text-slate-900">
+            AI request interpretation
+          </h3>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Natural-language context from the field agent — separate from rule outcomes
+          above.
+        </p>
         <p className="mt-3 text-sm leading-relaxed text-slate-600">
           {decision.aiNarrative}
         </p>

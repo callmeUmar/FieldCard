@@ -16,12 +16,13 @@ export const PARSED_REQUEST = {
   category: 'Plumbing Supply',
 }
 
+/** Display metadata — spend cap & expiry come from issuance (approved request amount, +4h) */
 export const DEMO_VIRTUAL_CARD = {
   lastFour: '4821',
-  spendLimitCents: 30_000,
   merchantCategories: ['Plumbing Supply', 'Hardware'],
-  expiresInHours: 48,
 }
+
+export const LIVE_DEMO_CARD_ID = 'card-live-demo-hen'
 
 export const ALLOWED_PURCHASE = {
   merchant: 'Ferguson Plumbing Supply',

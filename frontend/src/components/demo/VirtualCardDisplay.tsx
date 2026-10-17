@@ -5,11 +5,13 @@ export function VirtualCardDisplay({
   lastFour,
   spendLimitCents,
   categories,
+  issuedAt,
   expiresAt,
 }: {
   lastFour: string
   spendLimitCents: number
   categories: string[]
+  issuedAt: string
   expiresAt: string
 }) {
   return (
@@ -41,8 +43,18 @@ export function VirtualCardDisplay({
             <p className="mt-1 text-sm text-slate-200">{categories.join(', ')}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">Expires</p>
-            <p className="mt-1 text-sm text-slate-200">{formatDateTime(expiresAt)}</p>
+            <p className="text-[10px] uppercase tracking-wide text-slate-400">Issued</p>
+            <p className="mt-1 text-sm text-slate-200">{formatDateTime(issuedAt)}</p>
+          </div>
+          <div className="sm:col-span-3 sm:grid sm:grid-cols-2 sm:gap-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Expires (4h)</p>
+              <p className="mt-1 text-sm text-slate-200">{formatDateTime(expiresAt)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Cap basis</p>
+              <p className="mt-1 text-sm text-slate-200">Approved request amount (not worker max)</p>
+            </div>
           </div>
         </div>
         <p className="mt-6 text-xs text-indigo-200/90">

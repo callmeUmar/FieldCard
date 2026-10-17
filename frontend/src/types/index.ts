@@ -52,8 +52,11 @@ export interface VirtualCard {
   lastFour: string
   spendLimitCents: number
   merchantCategories: string[]
+  issuedAt: string
   expiresAt: string
-  status: 'active' | 'frozen' | 'expired'
+  status: 'active' | 'frozen' | 'expired' | 'used'
+  /** Live Agent Demo cards are single-use */
+  singleUse?: boolean
 }
 
 export interface PolicyRuleHit {
@@ -70,9 +73,9 @@ export interface PolicyDecision {
   jobId: string
   approved: boolean
   summary: string
-  confidence: number
   evaluatedAt: string
   rules: PolicyRuleHit[]
+  /** Natural-language context from the agent (interpretation), not a policy score */
   aiNarrative: string
 }
 

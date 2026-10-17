@@ -1,4 +1,5 @@
-import type { Job, PolicyRuleHit, Worker } from '../types'
+import { cardDeclineReason, isCardSpendable } from './cardLifecycle'
+import type { Job, PolicyRuleHit, VirtualCard, Worker } from '../types'
 
 export const BLOCKED_CATEGORIES = new Set([
   'General Retail',
@@ -16,8 +17,8 @@ export interface PurchaseEvaluationInput {
   merchant: string
   category: string
   amountCents: number
-  cardCategories: string[]
-  cardSpendLimitCents?: number
+  card?: VirtualCard
+  nowMs?: number
 }
 
 export interface PurchaseEvaluation {
@@ -110,8 +111,8 @@ export function agentRequestApproved(rules: PolicyRuleHit[]): boolean {
 export function evaluatePurchase(
   input: PurchaseEvaluationInput,
 ): PurchaseEvaluation {
-  const { job, worker, amountCents, category, cardCategories, cardSpendLimitCents } =
-    input
+  const { job, worker, amountCents, category, card, nowMs = Date.now() } = input
+  const cardCategories = card?.merchantCategories ?? []
   const rules: PolicyRuleHit[] = []
 
   rules.push({
@@ -166,13 +167,26 @@ export function evaluatePurchase(
       : 'Within auto-approve threshold',
   })
 
-  if (cardSpendLimitCents !== undefined) {
+  if (card) {
+    const spendable = isCardSpendable(card, nowMs)
+    rules.push({
+      ruleId: 'r-card-active',
+      title: 'Sandbox card lifecycle',
+      description: 'Card must be active, unexpired, and not already used',
+      passed: spendable,
+      detail: spendable
+        ? card.singleUse
+          ? 'Single-use card ready for authorization'
+          : 'Card is active'
+        : cardDeclineReason(card, amountCents, nowMs) ?? 'Card unavailable',
+    })
+
     rules.push({
       ruleId: 'r-card-limit',
       title: 'Virtual card spend cap',
-      description: 'Transaction must be under sandbox card limit',
-      passed: amountCents <= cardSpendLimitCents,
-      detail: `${formatUsd(amountCents)} vs ${formatUsd(cardSpendLimitCents)} card cap`,
+      description: 'Transaction must not exceed the issued card cap',
+      passed: amountCents <= card.spendLimitCents,
+      detail: `${formatUsd(amountCents)} vs ${formatUsd(card.spendLimitCents)} issued cap`,
     })
   }
 
@@ -183,13 +197,16 @@ export function evaluatePurchase(
   )
 
   if (hardFail) {
+    const cardReason = card ? cardDeclineReason(card, amountCents, nowMs) : undefined
     const declineReason = !categoryPass
       ? 'Merchant category not on job card allowlist'
-      : !budgetPass
-        ? 'Would exceed job materials budget'
-        : amountCents > worker.spendingLimitCents
-          ? 'Exceeds worker spending limit'
-          : 'Policy check failed'
+      : cardReason
+        ? cardReason
+        : !budgetPass
+          ? 'Would exceed job materials budget'
+          : amountCents > worker.spendingLimitCents
+            ? 'Exceeds worker spending limit'
+            : 'Policy check failed'
     return {
       approved: false,
       status: 'declined',

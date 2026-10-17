@@ -7,7 +7,7 @@ import {
   Wand2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fieldcardApi } from '../api/adapter'
+import { DuplicatePurchaseError, fieldcardApi } from '../api/adapter'
 import { DemoOutcome } from '../components/demo/DemoOutcome'
 import { PolicyStepList } from '../components/demo/PolicyStepList'
 import { StepRail } from '../components/demo/StepRail'
@@ -18,8 +18,8 @@ import { Card } from '../components/ui/Card'
 import {
   ALLOWED_PURCHASE,
   BLOCKED_PURCHASE,
-  DEMO_VIRTUAL_CARD,
   LIVE_AGENT_SMS,
+  LIVE_DEMO_CARD_ID,
   PARSED_REQUEST,
 } from '../demo/liveAgentScenario'
 import { useDashboard } from '../context/DashboardContext'
@@ -57,11 +57,10 @@ export function LiveAgentDemoPage() {
 
   const policyPassed = agentRequestApproved(policyRules)
 
-  const cardExpires = useMemo(() => {
-    return new Date(
-      Date.now() + DEMO_VIRTUAL_CARD.expiresInHours * 60 * 60 * 1000,
-    ).toISOString()
-  }, [])
+  const issuedDemoCard = useMemo(
+    () => data?.cards.find((c) => c.id === LIVE_DEMO_CARD_ID),
+    [data?.cards],
+  )
 
   const runPolicyReveal = useCallback(() => {
     setPolicyRunning(true)
@@ -102,12 +101,17 @@ export function LiveAgentDemoPage() {
   const railStep = step === 0 ? 0 : step >= 5 ? 5 : step - 1
 
   const runPurchase = async (variant: 'allowed' | 'blocked') => {
+    if (purchaseBusy) return
     setPurchaseBusy(true)
     try {
       const res = await fieldcardApi.runLiveAgentPurchase(variant)
       setResult(res)
       setStep(5)
       await refresh()
+    } catch (err) {
+      if (err instanceof DuplicatePurchaseError) {
+        window.alert(err.message)
+      }
     } finally {
       setPurchaseBusy(false)
     }
@@ -206,6 +210,12 @@ export function LiveAgentDemoPage() {
                 ['Merchant', PARSED_REQUEST.merchant],
                 ['Materials', PARSED_REQUEST.materials],
                 ['Amount', formatCurrencyPrecise(PARSED_REQUEST.amountCents)],
+                [
+                  'Worker limit',
+                  worker
+                    ? formatCurrencyPrecise(worker.spendingLimitCents)
+                    : '—',
+                ],
                 ['Category', PARSED_REQUEST.category],
               ].map(([label, value]) => (
                 <div
@@ -246,13 +256,20 @@ export function LiveAgentDemoPage() {
           </Card>
         )}
 
-        {step === 4 && (
+        {step === 4 && !issuedDemoCard && (
+          <Card className="p-6 text-sm text-slate-500">
+            Issuing sandbox card… go back one step if this persists.
+          </Card>
+        )}
+
+        {step === 4 && issuedDemoCard && (
           <div className="space-y-4">
             <VirtualCardDisplay
-              lastFour={DEMO_VIRTUAL_CARD.lastFour}
-              spendLimitCents={DEMO_VIRTUAL_CARD.spendLimitCents}
-              categories={DEMO_VIRTUAL_CARD.merchantCategories}
-              expiresAt={cardExpires}
+              lastFour={issuedDemoCard.lastFour}
+              spendLimitCents={issuedDemoCard.spendLimitCents}
+              categories={issuedDemoCard.merchantCategories}
+              issuedAt={issuedDemoCard.issuedAt}
+              expiresAt={issuedDemoCard.expiresAt}
             />
             <Card className="p-6">
               <h3 className="text-sm font-semibold text-slate-900">
