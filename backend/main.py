@@ -1,13 +1,18 @@
 import os
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from pymongo import MongoClient
 
-import agent
-import messaging
-from backend.messaging import router as messaging_router
-from db import find_merchant, log_activity, mongo, new_id, now
+# Safe fallback imports for Render & local execution
+try:
+    from backend import agent, messaging
+    from backend.db import find_merchant, log_activity, mongo, new_id, now
+    from backend.messaging import router as messaging_router
+except ImportError:
+    import agent
+    import messaging
+    from db import find_merchant, log_activity, mongo, new_id, now
+    from messaging import router as messaging_router
 
 YES_WORDS = {"YES", "Y"}
 DEMO_WORKER_ID = "w_mike"
@@ -22,8 +27,6 @@ _health_client = None
 
 @app.get("/health")
 def health():
-    # Separate client with a short timeout so a database outage can't hang
-    # this endpoint for pymongo's default 30s.
     global _health_client
     try:
         if _health_client is None:
@@ -36,9 +39,6 @@ def health():
     return {"ok": True, "time": now().isoformat(), "db": db_status}
 
 
-# TEMPORARY: minimal message routing so purchases can be demoed end to end.
-# Muhammad's main.py skeleton and Photon webhooks replace this section;
-# keep route_message's offer and DEMO_MODE handling when merging.
 class InboundMessage(BaseModel):
     from_phone: str
     text: str = ""
@@ -58,8 +58,6 @@ def route_message(from_phone: str, text: str, image_url: str | None = None) -> s
 
     offer = worker.get("offer")
     if offer:
-        # The offer only stands for the very next reply, so a later "yes"
-        # (e.g. confirming an estimate) can't trigger it by accident.
         mongo.workers.update_one({"_id": worker["_id"]}, {"$unset": {"offer": ""}})
         if (text or "").strip().strip(".!").upper() in YES_WORDS:
             return _accept_offer(worker, offer, text)
@@ -94,7 +92,7 @@ def _accept_offer(worker: dict, offer: dict, text: str) -> str | None:
     if result["status"] == "waiting_for_owner":
         return f"Asked {company['owner_name']}. I'll text you when they answer."
     if result["status"] == "issued":
-        return None  # issue_card already texted the card details
+        return None
     return "Can't get a card there: " + " ".join(result["reasons"])
 
 
@@ -107,7 +105,7 @@ def _require_dev():
 def dev_message(msg: InboundMessage):
     _require_dev()
     reply = route_message(msg.from_phone, msg.text, msg.image_url)
-    if reply:  # None: nothing more to send (e.g. the card text already went out)
+    if reply:
         messaging.send_text(msg.from_phone, reply)
     return {"reply": reply}
 
@@ -116,9 +114,6 @@ def dev_message(msg: InboundMessage):
 def dev_outbox():
     _require_dev()
     return messaging.DEV_OUTBOX
-
-
-# End TEMPORARY section.
 
 
 class SimulatedPurchase(BaseModel):
@@ -138,10 +133,11 @@ def _decline_text(reason: str | None, card: dict, req: dict) -> str:
 
 
 def _record_tiger(company_id, job_id, worker_id, amount, mcc, result) -> None:
-    # Tiger is a nice-to-have; an outage or missing module must never break the demo.
     try:
-        import tiger
-
+        try:
+            from backend import tiger
+        except ImportError:
+            import tiger
         tiger.record_spend_event(company_id, job_id, worker_id, amount, mcc, result)
     except Exception as e:
         print(f"[tiger] record_spend_event skipped: {e!r}")
@@ -152,4 +148,36 @@ def simulate_purchase(body: SimulatedPurchase):
     worker = mongo.workers.find_one({"_id": body.worker_id})
     if worker is None:
         raise HTTPException(404, "Unknown worker")
-    card = mongo.cards.find_
+
+    card = mongo.cards.find_one({"worker_id": worker["_id"], "state": "active"})
+    if card is None:
+        return {"status": "declined", "reason": "no_active_card"}
+
+    req = mongo.card_requests.find_one({"_id": card["request_id"]})
+    merchant = find_merchant(body.merchant_name)
+    mcc = merchant.get("mcc", "0000") if merchant else "0000"
+
+    # Evaluation check
+    reason = None
+    if card.get("expires_at") and card["expires_at"] < now():
+        reason = "card_expired"
+    elif card.get("used", False):
+        reason = "card_used"
+    elif body.amount > card.get("amount_cap_usd", 0):
+        reason = "over_amount_cap"
+
+    if reason:
+        _record_tiger(worker["company_id"], card.get("job_id"), worker["_id"], body.amount, mcc, "declined")
+        decline_msg = _decline_text(reason, card, req or {})
+        return {"status": "declined", "reason": reason, "message": decline_msg}
+
+    # Successful authorization
+    mongo.cards.update_one({"_id": card["_id"]}, {"$set": {"used": True, "state": "used"}})
+    _record_tiger(worker["company_id"], card.get("job_id"), worker["_id"], body.amount, mcc, "approved")
+    return {"status": "approved", "card_id": card["_id"]}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
