@@ -1,8 +1,8 @@
 const DEFAULT_API_URL = 'https://fieldcard.onrender.com'
 
-/** Backend base URL from VITE_API_URL (or NEXT_PUBLIC_API_URL), never localhost by default. */
+/** Backend base URL from NEXT_PUBLIC_API_URL (or VITE_API_URL), never localhost by default. */
 export const API_URL = (
-  import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL
+  import.meta.env.NEXT_PUBLIC_API_URL || import.meta.env.VITE_API_URL || DEFAULT_API_URL
 ).replace(/\/+$/, '')
 
 /** How often the activity feed polls the backend while live */
