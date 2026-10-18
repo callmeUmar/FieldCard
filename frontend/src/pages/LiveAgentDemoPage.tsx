@@ -5,7 +5,8 @@ import {
   Wand2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DuplicatePurchaseError, fieldcardApi } from '../api/adapter'
+import { DuplicatePurchaseError } from '../api/adapter'
+import { dashboardApi } from '../api/dataSource'
 import { DemoOutcome } from '../components/demo/DemoOutcome'
 import { DemoPurchasePanel } from '../components/demo/DemoPurchasePanel'
 import { PolicyStepList } from '../components/demo/PolicyStepList'
@@ -16,23 +17,20 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { liveDemoStepToPhonePhase } from '../demo/smsConversation'
-import {
-  LIVE_DEMO_CARD_ID,
-  PARSED_REQUEST,
-} from '../demo/liveAgentScenario'
+import { PARSED_REQUEST } from '../demo/liveAgentScenario'
 import { useDashboard } from '../context/DashboardContext'
 import {
   agentRequestApproved,
   evaluateAgentRequest,
 } from '../lib/policyEngine'
-import { formatCurrencyPrecise } from '../lib/format'
-import type { SimulatePurchaseResult } from '../types'
+import { formatCurrencyPrecise, jobRemainingCents } from '../lib/format'
+import type { SimulatePurchaseResult, VirtualCard } from '../types'
 import '../styles/landing.css'
 
 const STEP_COUNT = 6
 
 export function LiveAgentDemoPage() {
-  const { data, refresh, resetDemo } = useDashboard()
+  const { data, refresh, resetDemo, source } = useDashboard()
   const [step, setStep] = useState(0)
   const [policyRevealed, setPolicyRevealed] = useState(0)
   const [policyRunning, setPolicyRunning] = useState(false)
@@ -40,6 +38,8 @@ export function LiveAgentDemoPage() {
   const [purchaseBusy, setPurchaseBusy] = useState(false)
   const [purchaseFlash, setPurchaseFlash] = useState<'approved' | 'declined' | null>(null)
   const [result, setResult] = useState<SimulatePurchaseResult | null>(null)
+  const [demoCard, setDemoCard] = useState<VirtualCard | null>(null)
+  const [demoError, setDemoError] = useState<string | null>(null)
   const policyAnimStarted = useRef(false)
 
   const job = data?.jobs.find((j) => j.id === 'job_henderson')
@@ -56,9 +56,10 @@ export function LiveAgentDemoPage() {
 
   const policyPassed = agentRequestApproved(policyRules)
 
+  // The card issued in step 3; prefer its latest state from the snapshot (e.g. "used" after a purchase)
   const issuedDemoCard = useMemo(
-    () => data?.cards.find((c) => c.id === LIVE_DEMO_CARD_ID),
-    [data?.cards],
+    () => (demoCard ? (data?.cards.find((c) => c.id === demoCard.id) ?? demoCard) : undefined),
+    [data?.cards, demoCard],
   )
 
   const purchaseOutcome = result
@@ -114,8 +115,13 @@ export function LiveAgentDemoPage() {
 
   const goNext = async () => {
     if (step === 3 && !setupRecorded && policyRevealed >= policyRules.length) {
-      await fieldcardApi.recordLiveAgentSetup()
-      setSetupRecorded(true)
+      setDemoError(null)
+      try {
+        setDemoCard(await dashboardApi.recordLiveAgentSetup())
+        setSetupRecorded(true)
+      } catch (err) {
+        setDemoError(err instanceof Error ? err.message : 'Could not issue the card')
+      }
       await refresh()
     }
     setStep((s) => Math.min(s + 1, STEP_COUNT - 1))
@@ -127,15 +133,18 @@ export function LiveAgentDemoPage() {
     if (purchaseBusy) return
     setPurchaseBusy(true)
     setPurchaseFlash(null)
+    setDemoError(null)
     try {
-      const res = await fieldcardApi.runLiveAgentPurchase(variant)
+      const res = await dashboardApi.runLiveAgentPurchase(variant)
       setResult(res)
-      setPurchaseFlash(variant === 'allowed' ? 'approved' : 'declined')
+      setPurchaseFlash(res.transaction.status === 'declined' ? 'declined' : 'approved')
       setStep(5)
       await refresh()
     } catch (err) {
       if (err instanceof DuplicatePurchaseError) {
         window.alert(err.message)
+      } else {
+        setDemoError(err instanceof Error ? err.message : 'Purchase failed')
       }
     } finally {
       setPurchaseBusy(false)
@@ -149,6 +158,8 @@ export function LiveAgentDemoPage() {
     setPolicyRunning(false)
     setSetupRecorded(false)
     setResult(null)
+    setDemoCard(null)
+    setDemoError(null)
     setPurchaseFlash(null)
     policyAnimStarted.current = false
   }
@@ -207,7 +218,7 @@ export function LiveAgentDemoPage() {
                 worker ? formatCurrencyPrecise(worker.spendingLimitCents) : '—',
               ],
               ['MCC', PARSED_REQUEST.mcc],
-              ['Budget headroom', '$790.00 remaining'],
+              ['Budget headroom', job ? `${formatCurrencyPrecise(jobRemainingCents(job))} remaining` : '—'],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -249,7 +260,11 @@ export function LiveAgentDemoPage() {
 
       {step === 4 && !issuedDemoCard && (
         <Card className="p-6 text-sm text-slate-500">
-          Issuing sandbox card… go back one step if this persists.
+          {demoError ? (
+            <span className="text-rose-700">No card issued: {demoError}</span>
+          ) : (
+            'Issuing sandbox card… go back one step if this persists.'
+          )}
         </Card>
       )}
 
@@ -266,7 +281,9 @@ export function LiveAgentDemoPage() {
             onPurchase={runPurchase}
             busy={purchaseBusy}
             flash={purchaseFlash}
+            declineReason={result?.transaction.declineReason}
           />
+          {demoError && <p className="text-sm text-rose-700">{demoError}</p>}
         </div>
       )}
 
@@ -284,11 +301,12 @@ export function LiveAgentDemoPage() {
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
               Live Agent Demo
             </h2>
-            <Badge variant="simulated">Simulation</Badge>
+            <Badge variant="simulated">{source === 'live' ? 'Live backend' : 'Simulation'}</Badge>
           </div>
           <p className="mt-1 max-w-xl text-sm text-slate-500">
-            Cinematic walkthrough with simulated SMS and sandbox cards — not live Photon or
-            Visa authorization.
+            {source === 'live'
+              ? 'Card issuing and purchases run on the live backend: real policy engine, sandbox card provider, no real payments.'
+              : 'Cinematic walkthrough with simulated SMS and sandbox cards — not live Photon or Visa authorization.'}
           </p>
         </div>
         <Button variant="secondary" onClick={handleReset}>

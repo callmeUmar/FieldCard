@@ -1,5 +1,6 @@
 import { Activity, ArrowRight, Check, Clock3, Loader2, MessageSquareText, ShieldCheck, Stamp, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { resolveMerchantName } from '../api/liveMapping'
 import { MERCHANTS } from '../data/merchants'
 import { formatCurrencyPrecise } from '../lib/format'
 import type { Job, SimulatePurchaseResult } from '../types'
@@ -51,12 +52,24 @@ const RULE_STAGGER_MS = 130
  * once; the four stages then stage that single result for the viewer.
  */
 export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
-  const { simulate, simulating } = useDashboard()
+  const { simulate, simulating, data, source } = useDashboard()
+  // Live: the backend's own stores (names must match for its lookup). Offline: the bundled catalog.
+  const catalog = useMemo(
+    () =>
+      source === 'live' && data?.merchants.length
+        ? data.merchants.map((m) => ({ _id: m.id, name: m.name, mcc: m.mcc }))
+        : MERCHANTS,
+    [source, data],
+  )
   const activeJobs = useMemo(() => jobs.filter((j) => j.status === 'active'), [jobs])
 
   const [jobId, setJobId] = useState(activeJobs[0]?.id ?? '')
-  const [merchant, setMerchant] = useState(ferguson.name)
-  const [mcc, setMcc] = useState(ferguson.mcc)
+  const [chosenMerchant, setMerchant] = useState(ferguson.name)
+  const [chosenMcc, setMcc] = useState(ferguson.mcc)
+  // Show the chosen store as it exists in the current catalog (presets use catalog names like "Ferguson Plumbing Supply").
+  const catalogMatch = catalog.find((m) => m.name === resolveMerchantName(chosenMerchant, catalog))
+  const merchant = catalogMatch?.name ?? chosenMerchant
+  const mcc = catalogMatch?.mcc ?? chosenMcc
   const [amount, setAmount] = useState('125.00')
   const [phase, setPhase] = useState<Phase>('idle')
   const [run, setRun] = useState<{ request: { job?: Job; merchant: string; mcc: string; amountCents: number; spentBefore: number }; result?: SimulatePurchaseResult } | null>(null)
@@ -147,13 +160,13 @@ export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
               <select
                 value={merchant}
                 onChange={(e) => {
-                  const m = MERCHANTS.find((x) => x.name === e.target.value)
+                  const m = catalog.find((x) => x.name === e.target.value)
                   setMerchant(e.target.value)
                   if (m) setMcc(m.mcc)
                 }}
                 className={fieldClass}
               >
-                {MERCHANTS.map((m) => (
+                {catalog.map((m) => (
                   <option key={m._id} value={m.name}>
                     {m.name}
                   </option>

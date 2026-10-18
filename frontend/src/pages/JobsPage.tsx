@@ -69,10 +69,12 @@ export function JobsPage() {
                     {job.customerName}
                     <ArrowUpRight className="h-4 w-4 text-slate-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-slate-500" aria-hidden />
                   </h3>
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    <span className="truncate">{job.address}</span>
-                  </p>
+                  {job.address && (
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="truncate">{job.address}</span>
+                    </p>
+                  )}
 
                   <div className="mt-4 flex flex-wrap gap-2 text-xs">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 py-1 pl-1 pr-2.5 text-slate-700">
