@@ -1,49 +1,55 @@
-# TEMPORARY: minimal mock so agent.py can run. Muhammad will replace this file
-# with the real card provider. Keep the interface in contracts.md.
 import os
 import random
 from datetime import timedelta
-
-from db import mongo, new_id, now
-
+from db import mongo, now, new_id
 
 class MockProvider:
-    def create_card(self, request_id: str, mccs: list[str], amount_cap: float, hours: int) -> dict:
+    """Simulates credit card creation and authorizations for hackathon sandbox."""
+    
+    def create_card(self, request_id: str, mccs: list, amount_cap: float, hours: int) -> dict:
         card = {
             "_id": new_id("card"),
             "request_id": request_id,
-            "worker_id": None,
+            "provider": "mock",
             "last4": f"{random.randint(0, 9999):04d}",
-            "allowed_mccs": list(mccs),
-            "amount_cap_usd": round(amount_cap, 2),
+            "allowed_mccs": mccs,
+            "amount_cap_usd": amount_cap,
             "expires_at": now() + timedelta(hours=hours),
-            "state": "active",
+            "state": "active"
         }
         mongo.cards.insert_one(card)
         return card
 
     def simulate_purchase(self, card_id: str, merchant_name: str, mcc: str, amount: float) -> dict:
         card = mongo.cards.find_one({"_id": card_id})
-        if card is None:
-            return {"result": "declined", "decline_reason": "card_not_found"}
-        if card["state"] != "active":
-            return {"result": "declined", "decline_reason": f"card_{card['state']}"}
-        if card["expires_at"] <= now():
-            mongo.cards.update_one({"_id": card_id}, {"$set": {"state": "expired"}})
-            return {"result": "declined", "decline_reason": "card_expired"}
-        if mcc not in card["allowed_mccs"]:
-            return {"result": "declined", "decline_reason": "merchant_category_not_allowed"}
-        if amount > card["amount_cap_usd"]:
-            return {"result": "declined", "decline_reason": "over_amount_cap"}
-        mongo.cards.update_one({"_id": card_id}, {"$set": {"state": "used"}})
-        return {"result": "approved", "decline_reason": None}
+        reason = None
+        
+        # Safely normalize expiration date comparison against timezone offsets
+        current_time = now()
+        expires_at = card.get("expires_at") if card else None
+        if expires_at and current_time.tzinfo and not expires_at.tzinfo:
+            current_time = current_time.replace(tzinfo=None)
+
+        if not card or card.get("state") != "active":
+            reason = "card is not active"
+        elif expires_at and expires_at < current_time:
+            reason = "card has expired"
+        elif mcc not in card.get("allowed_mccs", []):
+            reason = "this card only works at the approved store type"
+        elif amount > card["amount_cap_usd"]:
+            reason = f"over the ${card['amount_cap_usd']:.0f} limit"
+
+        if reason is None:
+            mongo.cards.update_one({"_id": card_id}, {"$set": {"state": "used"}})
+            return {"result": "approved", "decline_reason": None}
+            
+        return {"result": "declined", "decline_reason": reason}
 
     def terminate_card(self, card_id: str) -> None:
         mongo.cards.update_one({"_id": card_id}, {"$set": {"state": "terminated"}})
 
-
-def get_provider() -> MockProvider:
-    name = os.getenv("CARD_PROVIDER", "mock")
-    if name != "mock":
-        raise NotImplementedError(f"CARD_PROVIDER={name} is not implemented yet")
-    return MockProvider()
+def get_provider():
+    name = os.environ.get("CARD_PROVIDER", "mock")
+    if name == "mock":
+        return MockProvider()
+    raise NotImplementedError(f"Card provider {name} not implemented yet")
