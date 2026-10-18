@@ -20,8 +20,18 @@ YES_WORDS = {"YES", "Y", "OK", "APPROVE"}
 NO_WORDS = {"NO", "N", "DENY"}
 
 # Created only when a key is set, so this module imports without one (tests, main.py).
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if os.getenv("GEMINI_API_KEY") else None
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Bounded timeout and retries: when Gemini is overloaded (503) the SDK would
+# otherwise keep retrying and hang the webhook.
+client = (
+    genai.Client(
+        api_key=os.getenv("GEMINI_API_KEY"),
+        http_options=types.HttpOptions(timeout=30_000, retry_options=types.HttpRetryOptions(attempts=3)),
+    )
+    if os.getenv("GEMINI_API_KEY")
+    else None
+)
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+BUSY_REPLY = "Fieldcard is busy right now. Please text again in a minute."
 SYSTEM_PROMPT = Path(__file__).with_name("system_prompt.txt").read_text()
 provider = cards.get_provider()
 
@@ -93,7 +103,11 @@ def handle_worker_message(worker: dict, text: str, image_url: str | None = None)
     message = text or "I sent a receipt photo."
     if text and image_url:
         message += "\n[Photo attached]"
-    reply = chats[phone].send_message(message, config=config)
+    try:
+        reply = chats[phone].send_message(message, config=config)
+    except genai.errors.APIError as e:
+        print(f"[agent] Gemini error for {phone}: {e.code} {e.status}")
+        return BUSY_REPLY
     return reply.text
 
 
