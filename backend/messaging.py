@@ -14,7 +14,7 @@ try:  # the same db module agent.py uses
 except ImportError:
     from backend.db import mongo, now
 
-router = APIRouter()
+router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 # main.py registers the function that routes an inbound text to the owner flow
 # or the Gemini agent (route_message) and texts back the reply.
@@ -42,7 +42,13 @@ def parse_inbound(payload: dict) -> dict | None:
     """
     if not isinstance(payload, dict):
         return None
-    msg = payload.get("message") if isinstance(payload.get("message"), dict) else payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    msg = (
+        payload.get("message")
+        if isinstance(payload.get("message"), dict)
+        else payload.get("data")
+        if isinstance(payload.get("data"), dict)
+        else payload
+    )
     if str(msg.get("direction", "inbound")).lower() != "inbound":
         return None
 
@@ -127,82 +133,6 @@ def photon_send(to_phone: str, text: str) -> None:
     """Sends outbound SMS using Photon API."""
     api_key = os.environ.get("PHOTON_API_KEY")
     project_id = os.environ.get("PHOTON_PROJECT_ID", "")
-    
+
     if project_id:
-        url = f"https://api.photon.codes/v1/projects/{project_id}/messages"
-    else:
-        url = os.environ.get("PHOTON_API_URL", "https://api.photon.codes/v1/messages")
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    body = {
-        "to": to_phone,
-        "from": os.environ.get("PHOTON_PHONE_NUMBER"),
-        "text": text,
-        "platform": "sms"
-    }
-    
-    response = requests.post(url, json=body, headers=headers, timeout=10)
-    print(f"[PHOTON OUTBOUND RESPONSE] Status: {response.status_code} | Body: {response.text}")
-    response.raise_for_status()
-
-
-def send_text(to_phone: str, text: str) -> None:
-    """Routes text via Photon or logs to dev outbox."""
-    if _suppressed.get():
-        print(f"[SMS suppressed (sandbox) -> {len(text)} chars]")
-        return
-    DEV_OUTBOX.append({"to": to_phone, "text": text})
-    
-    # Check if MESSAGING environment variable is explicitly set to dev
-    if os.environ.get("MESSAGING") == "dev":
-        print(f"[DEV OUTBOX -> {to_phone}]: {text}")
-        return
-
-    try:
-        photon_send(to_phone, text)
-    except Exception as e:
-        print(f"[PHOTON ERROR]: Failed to send SMS to {to_phone}: {e}")
-
-
-@router.api_route("/webhooks/photon", methods=["GET", "POST"])
-async def photon_webhook(request: Request, background: BackgroundTasks):
-    """
-    Photon webhook.
-    - GET: URL validation handshake.
-    - POST: an inbound text. Answered right away; the message is routed to the
-      owner flow or the Gemini agent in the background and the reply is texted back.
-    """
-    if request.method == "GET":
-        return Response(
-            content='{"status": "ok", "message": "Photon webhook endpoint active"}',
-            status_code=status.HTTP_200_OK,
-            media_type="application/json",
-        )
-    if not _token_ok(request):
-        return Response(content='{"detail": "bad token"}', status_code=401, media_type="application/json")
-
-    raw = await request.body()
-    try:
-        payload = json.loads(raw or b"{}")
-    except ValueError:
-        payload = {"raw_body": raw.decode("utf-8", errors="ignore")}
-    print(f"[WEBHOOK RECEIVED]: {payload}")
-
-    msg = parse_inbound(payload)
-    log = {"source": "photon", "payload": payload, "received_at": now(), "parsed": msg}
-    if msg and msg["id"]:
-        log["_id"] = f"photon_{msg['id']}"  # Photon may retry: handle each message once
-    if not _log(log):
-        return {"status": "duplicate"}
-    if msg is None:
-        return {"status": "ignored"}
-    if _inbound_handler is None:
-        print("[photon] no inbound handler registered; message logged only")
-        return {"status": "logged"}
-
-    print(f"[photon] inbound from {msg['from_phone'][-4:]}: {len(msg['text'])} chars, image={bool(msg['image_url'])}")
-    background.add_task(_inbound_handler, msg)
-    return {"status": "accepted"}
+        url = f"
