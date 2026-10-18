@@ -20,8 +20,18 @@ YES_WORDS = {"YES", "Y", "OK", "APPROVE"}
 NO_WORDS = {"NO", "N", "DENY"}
 
 # Created only when a key is set, so this module imports without one (tests, main.py).
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if os.getenv("GEMINI_API_KEY") else None
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Bounded timeout and retries: when Gemini is overloaded (503) the SDK would
+# otherwise keep retrying and hang the webhook.
+client = (
+    genai.Client(
+        api_key=os.getenv("GEMINI_API_KEY"),
+        http_options=types.HttpOptions(timeout=30_000, retry_options=types.HttpRetryOptions(attempts=3)),
+    )
+    if os.getenv("GEMINI_API_KEY")
+    else None
+)
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+BUSY_REPLY = "Fieldcard is busy right now. Please text again in a minute."
 SYSTEM_PROMPT = Path(__file__).with_name("system_prompt.txt").read_text()
 provider = cards.get_provider()
 
@@ -29,10 +39,14 @@ provider = cards.get_provider()
 chats: dict[str, object] = {}
 
 
-def handle_worker_message(worker: dict, text: str, image_url: str | None = None) -> str:
+def handle_worker_message(worker: dict, text: str, image_url: str | None = None) -> str | None:
+    """Returns the agent's reply, or None when there is nothing more to send
+    (Gemini failed after a card was issued; the card text already went out)."""
     if client is None:
         raise RuntimeError("GEMINI_API_KEY is not set")
     company = mongo.companies.find_one({"_id": worker["company_id"]})
+
+    card_issued = []  # set by request_card during this turn
 
     # Tools are closures over this worker and this message, so the model
     # cannot pick a different worker or image.
@@ -58,11 +72,15 @@ def handle_worker_message(worker: dict, text: str, image_url: str | None = None)
             est_amount_usd: Estimated total in US dollars.
 
         Returns:
-            {"status": "issued", "last4", "cap_usd", "store", "expires_in_hours"},
+            {"status": "issued", "store", "card_details_texted": True} (the card
+            details were already texted to the worker; do not repeat them),
             {"status": "waiting_for_owner", "owner", "reasons"} or
             {"status": "denied", "reasons"}.
         """
-        return request_card_flow(worker, company, job_id, merchant_name, items, est_amount_usd, text)
+        result = request_card_flow(worker, company, job_id, merchant_name, items, est_amount_usd, text)
+        if result["status"] == "issued":
+            card_issued.append(result)
+        return result
 
     def read_receipt(job_id: str) -> dict:
         """Read the receipt photo the worker just sent and check it against the job plan.
@@ -93,7 +111,12 @@ def handle_worker_message(worker: dict, text: str, image_url: str | None = None)
     message = text or "I sent a receipt photo."
     if text and image_url:
         message += "\n[Photo attached]"
-    reply = chats[phone].send_message(message, config=config)
+    try:
+        reply = chats[phone].send_message(message, config=config)
+    except genai.errors.APIError as e:
+        print(f"[agent] Gemini error for {phone}: {e.code} {e.status}")
+        # A card issued this turn was already texted by issue_card.
+        return None if card_issued else BUSY_REPLY
     return reply.text
 
 
@@ -138,14 +161,8 @@ def request_card_flow(worker, company, job_id, merchant_name, items, est, origin
     )
 
     if result.allowed:
-        card = issue_card(req_id)
-        return {
-            "status": "issued",
-            "last4": card["last4"],
-            "cap_usd": card["amount_cap_usd"],
-            "store": merchant["name"],
-            "expires_in_hours": CARD_HOURS,
-        }
+        issue_card(req_id)
+        return {"status": "issued", "store": merchant["name"], "card_details_texted": True}
     if result.needs_owner:
         ask_owner(req_id, company, worker, result.reasons)
         return {"status": "waiting_for_owner", "owner": company["owner_name"], "reasons": result.reasons}
@@ -168,12 +185,23 @@ def issue_card(req_id: str) -> dict:
     mongo.requests.update_one({"_id": req_id}, {"$set": {"status": "issued", "card_id": card["_id"]}})
 
     write_intent_receipt(req_id, card)
+    # Sent from code, not relayed by Gemini, so the worker always gets the
+    # exact card rules even if the model fails or paraphrases.
+    worker = mongo.workers.find_one({"_id": req["worker_id"]})
+    messaging.send_text(worker["phone"], card_text(card, req["merchant"]))
     log_activity(
         "card_issued",
         f"Card ending {card['last4']} issued: ${card['amount_cap_usd']:.2f} cap at {req['merchant']}, {CARD_HOURS}h",
         req["job_id"],
     )
     return card
+
+
+def card_text(card: dict, merchant: str) -> str:
+    return (
+        f"Card ...{card['last4']} works at {merchant} up to ${card['amount_cap_usd']:.2f} "
+        f"for {CARD_HOURS} hours."
+    )
 
 
 def ask_owner(req_id: str, company: dict, worker: dict, reasons: list[str]) -> None:
@@ -226,12 +254,8 @@ def handle_owner_message(company: dict, text: str) -> str:
     if decision == "approved":
         mongo.requests.update_one({"_id": req["_id"]}, {"$set": {"status": "approved"}})
         log_activity("approval_decided", f"{company['owner_name']} approved {worker['name']}'s request", req["job_id"])
-        card = issue_card(req["_id"])
-        messaging.send_text(
-            worker["phone"],
-            f"Fieldcard: {company['owner_name']} approved. Card ending {card['last4']}, "
-            f"cap ${card['amount_cap_usd']:.2f}, {req['merchant']} only, expires in {CARD_HOURS} hours.",
-        )
+        messaging.send_text(worker["phone"], f"Fieldcard: {company['owner_name']} approved your request.")
+        card = issue_card(req["_id"])  # texts the worker the card details
         return f"Approved. Card ending {card['last4']} sent to {worker['name']}."
 
     mongo.requests.update_one({"_id": req["_id"]}, {"$set": {"status": "denied"}})

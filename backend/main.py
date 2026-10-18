@@ -22,7 +22,7 @@ class InboundMessage(BaseModel):
     image_url: str | None = None
 
 
-def route_message(from_phone: str, text: str, image_url: str | None = None) -> str:
+def route_message(from_phone: str, text: str, image_url: str | None = None) -> str | None:
     company = mongo.companies.find_one({"owner_phone": from_phone})
     if company is not None:
         return agent.handle_owner_message(company, text)
@@ -53,7 +53,7 @@ def _claim_demo_worker(phone: str) -> dict | None:
     return worker
 
 
-def _accept_offer(worker: dict, offer: dict, text: str) -> str:
+def _accept_offer(worker: dict, offer: dict, text: str) -> str | None:
     for card in mongo.cards.find({"worker_id": worker["_id"], "state": "active"}):
         agent.provider.terminate_card(card["_id"])
         log_activity("card_terminated", f"Card ending {card['last4']} terminated", offer["job_id"])
@@ -71,10 +71,7 @@ def _accept_offer(worker: dict, offer: dict, text: str) -> str:
     if result["status"] == "waiting_for_owner":
         return f"Asked {company['owner_name']}. I'll text you when they answer."
     if result["status"] == "issued":
-        return (
-            f"New card ending {result['last4']}, cap ${result['cap_usd']:.2f}, "
-            f"{result['store']} only, expires in {result['expires_in_hours']} hours."
-        )
+        return None  # issue_card already texted the card details
     return "Can't get a card there: " + " ".join(result["reasons"])
 
 
@@ -87,7 +84,8 @@ def _require_dev():
 def dev_message(msg: InboundMessage):
     _require_dev()
     reply = route_message(msg.from_phone, msg.text, msg.image_url)
-    messaging.send_text(msg.from_phone, reply)
+    if reply:  # None: nothing more to send (e.g. the card text already went out)
+        messaging.send_text(msg.from_phone, reply)
     return {"reply": reply}
 
 
