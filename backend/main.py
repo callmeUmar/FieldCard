@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from pymongo import MongoClient
 
 import agent
 import messaging
@@ -11,6 +12,24 @@ YES_WORDS = {"YES", "Y"}
 DEMO_WORKER_ID = "w_mike"
 
 app = FastAPI(title="Fieldcard")
+
+_health_client = None
+
+
+@app.get("/health")
+def health():
+    # Separate client with a short timeout so a database outage can't hang
+    # this endpoint for pymongo's default 30s.
+    global _health_client
+    try:
+        if _health_client is None:
+            _health_client = MongoClient(os.getenv("MONGODB_URI"), serverSelectionTimeoutMS=2000)
+        _health_client.admin.command("ping")
+        db_status = "ok"
+    except Exception as e:
+        print(f"[health] MongoDB ping failed: {type(e).__name__}")
+        db_status = "error"
+    return {"ok": True, "time": now().isoformat(), "db": db_status}
 
 
 # TEMPORARY: minimal message routing so purchases can be demoed end to end.

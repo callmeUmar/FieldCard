@@ -58,3 +58,7 @@ dashboard/           Next.js dashboard
 ## Configuration
 
 Environment variables are in `backend/.env.example`. `CARD_PROVIDER=mock` and `MESSAGING=dev` let the backend run without external services. `DEMO_MODE=1` enables demo shortcuts.
+
+## Demo
+
+Before each judging slot, open /health to wake the Render server. It returns `{"ok": true, "time": ..., "db": "ok" | "error"}`; `"db": "error"` means MongoDB is unreachable.
