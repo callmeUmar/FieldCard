@@ -30,7 +30,7 @@ export function HeroCopy({ beat = false }: { beat?: boolean }) {
           <ArrowRight className="h-4 w-4" />
         </Link>
         <Link
-          to="/"
+          to="/dashboard"
           className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/10"
         >
           Open dashboard

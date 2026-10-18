@@ -70,7 +70,7 @@ export function FinalCta() {
             Try the interactive demo
             <ArrowRight className="lx-btn-arrow" aria-hidden />
           </Link>
-          <Link to="/" className="lx-btn-secondary">
+          <Link to="/dashboard" className="lx-btn-secondary">
             <LayoutDashboard aria-hidden />
             Open dashboard
           </Link>

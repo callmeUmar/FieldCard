@@ -16,9 +16,11 @@ export default function App() {
     <DashboardProvider>
       <BrowserRouter>
         <Routes>
+          {/* Opening the site lands on the landing page; the owner console starts at /dashboard. */}
+          <Route index element={<Navigate to="/landing" replace />} />
           <Route path="/landing" element={<LandingPage />} />
           <Route element={<AppShell />}>
-            <Route index element={<OverviewPage />} />
+            <Route path="dashboard" element={<OverviewPage />} />
             <Route path="live-demo" element={<LiveAgentDemoPage />} />
             <Route path="jobs" element={<JobsPage />} />
             <Route path="jobs/:jobId" element={<JobDetailPage />} />
@@ -26,8 +28,8 @@ export default function App() {
             <Route path="activity" element={<ActivityPage />} />
             <Route path="simulator" element={<SimulatorPage />} />
             <Route path="policy/:policyId" element={<PolicyPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
+          <Route path="*" element={<Navigate to="/landing" replace />} />
         </Routes>
       </BrowserRouter>
     </DashboardProvider>

@@ -63,7 +63,7 @@ export function DemoOutcome({
           <Link to={`/policy/${policyDecision.id}`} className={buttonClass('secondary')}>
             View policy detail
           </Link>
-          <Link to="/" className={buttonClass('secondary')}>
+          <Link to="/dashboard" className={buttonClass('secondary')}>
             Back to overview
           </Link>
           <Button variant="primary" onClick={onReset}>

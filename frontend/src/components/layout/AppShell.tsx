@@ -20,7 +20,7 @@ const nav: {
   end?: boolean
   badge?: 'pending'
 }[] = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/jobs', label: 'Jobs', icon: Briefcase },
   { to: '/approvals', label: 'Approvals', icon: ShieldCheck, badge: 'pending' },
   { to: '/activity', label: 'Activity', icon: Activity },
