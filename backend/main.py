@@ -56,12 +56,25 @@ class InboundMessage(BaseModel):
     image_url: str | None = None
 
 
+def _digits(phone: str | None) -> str:
+    d = "".join(ch for ch in phone or "" if ch.isdigit())
+    return d[-10:]  # US numbers: "+1 (555) 000-1111" and "5550001111" match
+
+
+def _find_by_phone(collection, field: str, phone: str) -> dict | None:
+    """Exact match first; otherwise compare digits, since providers format numbers differently."""
+    doc = collection.find_one({field: phone})
+    if doc is not None or len(_digits(phone)) < 10:
+        return doc
+    return next((d for d in collection.find({field: {"$ne": None}}) if _digits(d.get(field)) == _digits(phone)), None)
+
+
 def route_message(from_phone: str, text: str, image_url: str | None = None) -> str | None:
-    company = mongo.companies.find_one({"owner_phone": from_phone})
+    company = _find_by_phone(mongo.companies, "owner_phone", from_phone)
     if company is not None:
         return agent.handle_owner_message(company, text)
 
-    worker = mongo.workers.find_one({"phone": from_phone})
+    worker = _find_by_phone(mongo.workers, "phone", from_phone)
     if worker is None and os.getenv("DEMO_MODE") == "1":
         worker = _claim_demo_worker(from_phone)
     if worker is None:
@@ -74,6 +87,20 @@ def route_message(from_phone: str, text: str, image_url: str | None = None) -> s
             return _accept_offer(worker, offer, text)
 
     return agent.handle_worker_message(worker, text, image_url)
+
+
+def handle_inbound_sms(msg: dict) -> None:
+    """Photon webhook -> owner flow or Gemini agent -> reply by SMS. Runs in the background."""
+    try:
+        reply = route_message(msg["from_phone"], msg["text"], msg.get("image_url"))
+    except Exception as e:
+        print(f"[photon] routing failed: {type(e).__name__}: {e}")
+        reply = "Fieldcard hit a problem with that message. Please try again in a minute."
+    if reply:  # None: nothing more to send (e.g. the card text already went out)
+        messaging.send_text(msg["from_phone"], reply)
+
+
+messaging.on_inbound(handle_inbound_sms)
 
 
 def _claim_demo_worker(phone: str) -> dict | None:
