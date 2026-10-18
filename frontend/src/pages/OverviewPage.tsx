@@ -161,7 +161,7 @@ export function OverviewPage() {
                         <Badge variant="code">{job.code}</Badge>
                         <p className="mt-2 truncate text-[15px] font-semibold tracking-tight text-slate-900">{job.customerName}</p>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
-                          {worker?.name} · {job.trade.toUpperCase()} · {job.address.split(',')[0]}
+                          {worker?.name} · {job.trade.toUpperCase()}{job.address && ` · ${job.address.split(',')[0]}`}
                         </p>
                       </div>
                       <BudgetMeter job={job} />

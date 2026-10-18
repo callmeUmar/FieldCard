@@ -21,7 +21,7 @@ See [contracts.md](contracts.md) for the interfaces between modules and the Mong
 |---|---|
 | Umar | `agent.py` (Gemini agent), `policy.py` (policy engine), `db.py` (database helpers), owner approvals, purchase recording, intent receipts, `system_prompt.txt` |
 | Muhammad | `messaging.py` (Photon SMS adapter), `cards.py` (card provider), `vision.py` (receipt OCR), `main.py` skeleton and webhooks |
-| Raimbek | `tiger.py`, `seed.py`, read endpoints, Next.js `dashboard/` |
+| Raimbek | `tiger.py`, `seed.py`, read endpoints, React (Vite) `frontend/` |
 
 Coordinate before editing a file someone else owns.
 
@@ -41,7 +41,7 @@ backend/
   seed.py            Demo data
   requirements.txt
   .env.example
-dashboard/           Next.js dashboard
+frontend/            React + Vite dashboard (VITE_API_URL, defaults to https://fieldcard.onrender.com)
 ```
 
 ## Rules

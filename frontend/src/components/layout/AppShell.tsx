@@ -29,7 +29,7 @@ const nav: {
 
 export function AppShell() {
   const location = useLocation()
-  const { data } = useDashboard()
+  const { data, source } = useDashboard()
   const [mobileOpen, setMobileOpen] = useState(false)
   // Count from live transactions so the badge always matches the queue
   const pending = data?.transactions.filter((t) => t.status === 'pending').length ?? 0
@@ -164,6 +164,18 @@ export function AppShell() {
             <span className="hidden sm:inline"> · Job-controlled field spend</span>
           </p>
           <div className="ml-auto flex items-center gap-3">
+            {data && (
+              <span
+                className={`fc-kicker inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] ring-1 ring-inset ${
+                  source === 'live' ? 'bg-emerald-50 text-emerald-800 ring-emerald-600/20' : 'bg-slate-100 text-slate-600 ring-slate-400/30'
+                }`}
+                title={source === 'live' ? 'Showing live data from the Fieldcard backend' : 'Backend unreachable: showing bundled demo data. Retrying every 10s.'}
+                role="status"
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${source === 'live' ? 'bg-emerald-500' : 'bg-slate-400'}`} aria-hidden />
+                {source === 'live' ? 'Live' : 'Offline demo data'}
+              </span>
+            )}
             <span className="fc-kicker inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] text-amber-800 ring-1 ring-inset ring-amber-600/20">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
               Sandbox

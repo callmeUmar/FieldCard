@@ -1,5 +1,7 @@
 import os
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pymongo import MongoClient
 
@@ -18,6 +20,15 @@ YES_WORDS = {"YES", "Y"}
 DEMO_WORKER_ID = "w_mike"
 
 app = FastAPI(title="Fieldcard")
+
+# The dashboard is served from another origin (e.g. Vercel), so browsers need CORS.
+# CORS_ORIGINS is a comma-separated list; "*" (default) allows any origin, without credentials.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 # Register the messaging router so /webhooks/photon is served
 app.include_router(messaging_router)
@@ -211,6 +222,284 @@ def simulate_purchase(body: SimulatedPurchase):
         "transaction_id": txn["_id"],
         "card_id": card["_id"],
     }
+
+
+# ---------- Dashboard read API (read-only)
+# Everything here only reads the existing collections. Phones are masked and
+# the /ai/audit sandbox worker is hidden. 503 when MongoDB is unreachable, so
+# the dashboard can switch to its offline demo data quickly.
+
+import re  # noqa: E402
+
+DEMO_COMPANY_ID = os.getenv("DEMO_COMPANY_ID", "co_ballard")
+SANDBOX_PHONE_PREFIX = "sandbox:"
+READ_LIMIT = 200
+
+
+def _require_db() -> None:
+    if not agent.db.reachable():
+        raise HTTPException(503, "Database unreachable")
+
+
+def _mask_phone(phone: str | None) -> str | None:
+    digits = re.sub(r"\D", "", phone or "")
+    return f"•••-•••-{digits[-4:]}" if len(digits) >= 4 else None
+
+
+def _company_doc(company_id: str | None) -> dict:
+    _require_db()
+    company = mongo.companies.find_one({"_id": company_id or DEMO_COMPANY_ID})
+    if company is None:
+        raise HTTPException(404, "Unknown company")
+    return company
+
+
+def _public_company(c: dict) -> dict:
+    return {
+        "_id": c["_id"],
+        "name": c.get("name"),
+        "owner_name": c.get("owner_name"),
+        "owner_phone": _mask_phone(c.get("owner_phone")),
+        "approval_threshold_usd": c.get("approval_threshold_usd"),
+    }
+
+
+def _workers_of(company: dict) -> list[dict]:
+    return [
+        {
+            "_id": w["_id"],
+            "company_id": w.get("company_id"),
+            "name": w.get("name"),
+            "phone": _mask_phone(w.get("phone")),
+            "per_purchase_limit_usd": w.get("per_purchase_limit_usd"),
+        }
+        for w in mongo.workers.find({"company_id": company["_id"]})
+        if not str(w.get("phone") or "").startswith(SANDBOX_PHONE_PREFIX)
+    ]
+
+
+def _requests_of(worker_ids: list[str], status: str | None = None) -> list[dict]:
+    query: dict = {"worker_id": {"$in": worker_ids}}
+    if status:
+        query["status"] = status
+    return list(mongo.requests.find(query).sort("created_at", -1).limit(READ_LIMIT))
+
+
+def _cards_of(worker_ids: list[str], requests: list[dict], state: str | None = None) -> list[dict]:
+    job_by_request = {r["_id"]: r.get("job_id") for r in requests}
+    query: dict = {"worker_id": {"$in": worker_ids}}
+    if state:
+        query["state"] = state
+    cards = list(mongo.cards.find(query).sort("expires_at", -1).limit(READ_LIMIT))
+    missing = [c["request_id"] for c in cards if c.get("request_id") not in job_by_request]
+    for r in mongo.requests.find({"_id": {"$in": missing}}, {"job_id": 1}):
+        job_by_request[r["_id"]] = r.get("job_id")
+    return [{**c, "job_id": job_by_request.get(c.get("request_id"))} for c in cards]
+
+
+def _jobs_of(company: dict, cards: list[dict]) -> list[dict]:
+    committed: dict[str, float] = {}
+    for c in cards:  # active cards hold budget until they're used or expire
+        if c.get("state") == "active" and c.get("job_id") and c.get("expires_at") and c["expires_at"] > now():
+            committed[c["job_id"]] = committed.get(c["job_id"], 0) + c.get("amount_cap_usd", 0)
+    return [
+        {
+            **j,
+            "remaining_usd": round(j.get("materials_budget_usd", 0) - j.get("spent_usd", 0), 2),
+            "committed_usd": round(committed.get(j["_id"], 0), 2),
+        }
+        for j in mongo.jobs.find({"company_id": company["_id"]}).sort("code", 1)
+    ]
+
+
+def _activity_of(job_ids: list[str], limit: int, job_id: str | None = None, since: str | None = None) -> list[dict]:
+    query: dict = {"job_id": job_id} if job_id else {"$or": [{"job_id": {"$in": job_ids}}, {"job_id": None}]}
+    if since:
+        try:
+            # An unencoded "+00:00" arrives as " 00:00" in a query string.
+            query["at"] = {"$gt": datetime.fromisoformat(since.replace(" ", "+").replace("Z", "+00:00"))}
+        except ValueError:
+            raise HTTPException(400, "since must be an ISO timestamp")
+    items = mongo.activity.find(query).sort("at", -1).limit(min(limit, READ_LIMIT))
+    # Hide /ai/audit sandbox traffic from the owner's feed.
+    return [a for a in items if not str(a.get("message", "")).startswith(AUDIT_WORKER["name"])]
+
+
+def _scope(company_id: str | None):
+    company = _company_doc(company_id)
+    workers = _workers_of(company)
+    worker_ids = [w["_id"] for w in workers]
+    return company, workers, worker_ids
+
+
+@app.get("/api/company")
+def api_company(company_id: str | None = None):
+    return _public_company(_company_doc(company_id))
+
+
+@app.get("/api/workers")
+def api_workers(company_id: str | None = None):
+    return _workers_of(_company_doc(company_id))
+
+
+@app.get("/api/merchants")
+def api_merchants():
+    _require_db()
+    return list(mongo.merchants.find().sort("name", 1))
+
+
+@app.get("/api/jobs")
+def api_jobs(company_id: str | None = None):
+    company, _, worker_ids = _scope(company_id)
+    return _jobs_of(company, _cards_of(worker_ids, _requests_of(worker_ids)))
+
+
+@app.get("/api/jobs/{job_id}")
+def api_job(job_id: str, company_id: str | None = None):
+    company, _, worker_ids = _scope(company_id)
+    requests = _requests_of(worker_ids)
+    cards = _cards_of(worker_ids, requests)
+    job = next((j for j in _jobs_of(company, cards) if j["_id"] == job_id), None)
+    if job is None:
+        raise HTTPException(404, "Unknown job")
+    return {
+        **job,
+        "cards": [c for c in cards if c["job_id"] == job_id],
+        "requests": [r for r in requests if r.get("job_id") == job_id],
+        "transactions": list(mongo.transactions.find({"job_id": job_id}).sort("occurred_at", -1).limit(READ_LIMIT)),
+        "receipts": list(mongo.receipts.find({"job_id": job_id}).limit(READ_LIMIT)),
+    }
+
+
+@app.get("/api/jobs/{job_id}/burn")
+def api_job_burn(job_id: str, company_id: str | None = None):
+    """Cumulative materials spend over time, for the spend chart. Spend from
+    before Fieldcard tracked purchases is shown as a starting baseline."""
+    company = _company_doc(company_id)
+    job = mongo.jobs.find_one({"_id": job_id, "company_id": company["_id"]})
+    if job is None:
+        raise HTTPException(404, "Unknown job")
+    txns = list(mongo.transactions.find({"job_id": job_id, "result": "approved"}).sort("occurred_at", 1))
+    spent = job.get("spent_usd", 0)
+    baseline = round(spent - sum(t.get("amount_usd", 0) for t in txns), 2)
+    start = txns[0]["occurred_at"] - timedelta(hours=1) if txns else now() - timedelta(days=1)
+    points = [{"at": start, "spent_usd": baseline, "amount_usd": None, "merchant_name": None}]
+    running = baseline
+    for t in txns:
+        running = round(running + t.get("amount_usd", 0), 2)
+        points.append({"at": t["occurred_at"], "spent_usd": running, "amount_usd": t.get("amount_usd"), "merchant_name": t.get("merchant_name")})
+    points.append({"at": now(), "spent_usd": round(spent, 2), "amount_usd": None, "merchant_name": None})
+    return {
+        "job_id": job_id,
+        "budget_usd": job.get("materials_budget_usd", 0),
+        "spent_usd": spent,
+        "baseline_usd": baseline,
+        "points": points,
+    }
+
+
+@app.get("/api/cards")
+def api_cards(state: str | None = None, company_id: str | None = None):
+    _, _, worker_ids = _scope(company_id)
+    return _cards_of(worker_ids, _requests_of(worker_ids), state)
+
+
+@app.get("/api/requests")
+def api_requests(status: str | None = None, company_id: str | None = None):
+    _, _, worker_ids = _scope(company_id)
+    return _requests_of(worker_ids, status)
+
+
+@app.get("/api/approvals")
+def api_approvals(status: str | None = None, company_id: str | None = None):
+    _, _, worker_ids = _scope(company_id)
+    requests = {r["_id"]: r for r in _requests_of(worker_ids)}
+    query: dict = {"request_id": {"$in": list(requests)}}
+    if status:
+        query["status"] = status
+    return [
+        {**a, "owner_phone": _mask_phone(a.get("owner_phone")), "request": requests.get(a["request_id"])}
+        for a in mongo.approvals.find(query).sort("created_at", -1).limit(READ_LIMIT)
+    ]
+
+
+@app.get("/api/transactions")
+def api_transactions(job_id: str | None = None, limit: int = 100, company_id: str | None = None):
+    company = _company_doc(company_id)
+    job_ids = [j["_id"] for j in mongo.jobs.find({"company_id": company["_id"]}, {"_id": 1})]
+    query = {"job_id": job_id} if job_id in job_ids else {"job_id": {"$in": job_ids}}
+    return list(mongo.transactions.find(query).sort("occurred_at", -1).limit(min(limit, READ_LIMIT)))
+
+
+@app.get("/api/receipts")
+def api_receipts(job_id: str | None = None, company_id: str | None = None):
+    company = _company_doc(company_id)
+    job_ids = [j["_id"] for j in mongo.jobs.find({"company_id": company["_id"]}, {"_id": 1})]
+    query = {"job_id": job_id} if job_id in job_ids else {"job_id": {"$in": job_ids}}
+    return list(mongo.receipts.find(query).limit(READ_LIMIT))
+
+
+@app.get("/api/activity")
+def api_activity(limit: int = 50, job_id: str | None = None, since: str | None = None, company_id: str | None = None):
+    company = _company_doc(company_id)
+    job_ids = [j["_id"] for j in mongo.jobs.find({"company_id": company["_id"]}, {"_id": 1})]
+    return _activity_of(job_ids, limit, job_id, since)
+
+
+@app.get("/api/dashboard")
+def api_dashboard(company_id: str | None = None):
+    """Everything the dashboard shows, in one read (so a refresh is one request)."""
+    company, workers, worker_ids = _scope(company_id)
+    requests = _requests_of(worker_ids)
+    cards = _cards_of(worker_ids, requests)
+    jobs = _jobs_of(company, cards)
+    job_ids = [j["_id"] for j in jobs]
+    by_request = {r["_id"]: r for r in requests}
+    approvals = [
+        {**a, "owner_phone": _mask_phone(a.get("owner_phone")), "request": by_request.get(a["request_id"])}
+        for a in mongo.approvals.find({"request_id": {"$in": list(by_request)}}).sort("created_at", -1).limit(READ_LIMIT)
+    ]
+    return {
+        "company": _public_company(company),
+        "workers": workers,
+        "merchants": list(mongo.merchants.find().sort("name", 1)),
+        "jobs": jobs,
+        "cards": cards,
+        "requests": requests,
+        "approvals": approvals,
+        "transactions": list(mongo.transactions.find({"job_id": {"$in": job_ids}}).sort("occurred_at", -1).limit(READ_LIMIT)),
+        "receipts": list(mongo.receipts.find({"job_id": {"$in": job_ids}}).limit(READ_LIMIT)),
+        "activity": _activity_of(job_ids, 100),
+    }
+
+
+class DemoCardRequest(BaseModel):
+    worker_id: str
+    job_id: str
+    merchant_name: str
+    amount_usd: float
+    items: str = "materials"
+    text: str = ""
+
+
+@app.post("/api/dev/request-card")
+def dev_request_card(body: DemoCardRequest):
+    """Dashboard Live Agent Demo: runs the real policy engine and card issuing
+    for an already-parsed request (no AI). Dev-only, like /api/dev/message."""
+    _require_dev()
+    _require_db()
+    worker = mongo.workers.find_one({"_id": body.worker_id})
+    if worker is None:
+        raise HTTPException(404, "Unknown worker")
+    company = mongo.companies.find_one({"_id": worker["company_id"]})
+    # A new demo run replaces the previous run's card, as a worker's YES to an offer does.
+    for card in mongo.cards.find({"worker_id": worker["_id"], "state": "active"}):
+        agent.provider.terminate_card(card["_id"])
+        log_activity("card_terminated", f"Card ending {card['last4']} terminated for a new demo run", body.job_id)
+    text = body.text or f"Dashboard demo: ${body.amount_usd:.2f} of {body.items} at {body.merchant_name}"
+    result = agent.request_card_flow(worker, company, body.job_id, body.merchant_name, body.items, body.amount_usd, text)
+    card = mongo.cards.find_one({"worker_id": worker["_id"], "state": "active"}, sort=[("expires_at", -1)])
+    return {**result, "card": {**card, "job_id": body.job_id} if result["status"] == "issued" and card else None}
 
 
 # ---------- VEYZL audit endpoint

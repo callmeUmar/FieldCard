@@ -1,7 +1,10 @@
-import { ArrowLeft, Briefcase, ChevronRight, CreditCard, Gauge, MapPin, ShoppingBag, UserRound } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { AlertTriangle, ArrowLeft, Briefcase, ChevronRight, CreditCard, Gauge, MapPin, Receipt, ShoppingBag, UserRound } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { dashboardApi } from '../api/dataSource'
+import type { BurnSeries } from '../api/liveMapping'
 import { BudgetMeter } from '../components/BudgetProgress'
+import { SpendChart } from '../components/SpendChart'
 import { VirtualCardDisplay } from '../components/demo/VirtualCardDisplay'
 import { TransactionInspector } from '../components/TransactionInspector'
 import { TransactionRow } from '../components/TransactionRow'
@@ -26,6 +29,28 @@ export function JobDetailPage() {
   const { data, loading } = useDashboard()
   const [selected, setSelected] = useState<string | null>(null)
   const close = useCallback(() => setSelected(null), [])
+  const [burn, setBurn] = useState<BurnSeries | null>(null)
+
+  // Refetch the spend series only when this job's spend or purchases change, not on every activity poll.
+  const dataRef = useRef(data)
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
+  const jobSnapshot = data?.jobs.find((j) => j.id === jobId)
+  const burnKey = `${data?.source}:${jobSnapshot?.spentCents}:${data?.transactions.filter((t) => t.jobId === jobId).length}`
+  useEffect(() => {
+    const snap = dataRef.current
+    if (!snap || !jobId) return
+    let cancelled = false
+    dashboardApi
+      .getBurn(jobId, snap)
+      .then((b) => !cancelled && setBurn(b))
+      .catch(() => !cancelled && setBurn(null))
+    return () => {
+      cancelled = true
+    }
+  }, [jobId, burnKey])
+
   if (loading || !data) return <PageLoading label="Loading job…" />
 
   const job = data.jobs.find((j) => j.id === jobId)
@@ -44,6 +69,7 @@ export function JobDetailPage() {
   const worker = data.workers.find((w) => w.id === job.assignedWorkerId)
   const card = currentCard(data.cards.filter((c) => c.jobId === job.id))
   const txns = byNewest(data.transactions.filter((t) => t.jobId === job.id))
+  const receipts = (data.receipts ?? []).filter((r) => r.jobId === job.id)
   const latest = txns[0]
   const risk = budgetRisk(job)
 
@@ -79,10 +105,12 @@ export function JobDetailPage() {
           <Badge variant={job.status === 'active' ? 'success' : 'default'}>{job.status.replace('_', ' ')}</Badge>
         </div>
         <h2 className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-[-0.025em] text-slate-900 sm:text-[2rem]">{job.customerName}</h2>
-        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
-          <MapPin className="h-4 w-4 shrink-0" aria-hidden />
-          {job.address}
-        </p>
+        {job.address && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
+            <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+            {job.address}
+          </p>
+        )}
       </div>
 
       {/* The relationship, left to right */}
@@ -126,6 +154,16 @@ export function JobDetailPage() {
             {job.notes && <p className="mt-5 border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-600">{job.notes}</p>}
           </Card>
 
+          {burn && burn.points.length > 1 && (
+            <Card className="fc-enter fc-enter-2 p-5 sm:p-6">
+              <p className="text-[15px] font-semibold tracking-tight text-slate-900">Materials spend over time</p>
+              <p className="mt-0.5 text-xs text-slate-500">Cumulative spend on {job.code} against its {usd(burn.budgetCents)} budget</p>
+              <div className="mt-4">
+                <SpendChart series={burn} />
+              </div>
+            </Card>
+          )}
+
           <Card className="fc-enter fc-enter-3 overflow-hidden">
             <CardHeader title="Purchases" description={`${txns.length} on this job · select one for its decision and budget impact`} />
             {txns.length === 0 ? (
@@ -141,6 +179,42 @@ export function JobDetailPage() {
                   selected={selected === txn.id}
                 />
               ))
+            )}
+          </Card>
+
+          <Card className="fc-enter fc-enter-3 overflow-hidden">
+            <CardHeader title="Receipts" description="Receipt photos texted by the crew, checked against the job's planned materials" />
+            {receipts.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-slate-500">No receipts yet. They appear here when a worker texts a photo.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {receipts.map((r) => (
+                  <li key={r.id} className="px-5 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <Receipt className="h-4 w-4 text-slate-400" aria-hidden />
+                        {r.store}
+                      </p>
+                      {r.totalCents != null && <p className="fc-num text-sm font-semibold text-slate-900">{usd(r.totalCents)}</p>}
+                    </div>
+                    {r.items.length > 0 && <p className="mt-1 text-xs text-slate-500">{r.items.join(' · ')}</p>}
+                    {r.flags.length > 0 ? (
+                      <ul className="mt-2 space-y-1">
+                        {r.flags.map((f) => (
+                          <li key={f} className="flex items-start gap-1.5 text-xs text-amber-800">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                            <span>
+                              <span className="font-semibold">Not in plan:</span> {f}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-xs text-emerald-700">All items match the plan</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
         </div>

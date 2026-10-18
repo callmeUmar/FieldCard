@@ -7,10 +7,13 @@ export function DemoPurchasePanel({
   onPurchase,
   busy,
   flash,
+  declineReason,
 }: {
   onPurchase: (variant: 'allowed' | 'blocked') => void
   busy: boolean
   flash: 'approved' | 'declined' | null
+  /** The card network's reason, when the backend gives one */
+  declineReason?: string
 }) {
   return (
     <Card className={`overflow-hidden p-6 transition-shadow duration-500 ${flash === 'approved' ? 'purchase-glow-approve' : ''} ${flash === 'declined' ? 'purchase-glow-decline' : ''}`}>
@@ -40,7 +43,9 @@ export function DemoPurchasePanel({
           <div>
             <p className="font-semibold text-rose-900">Purchase blocked</p>
             <p className="text-sm text-rose-800">
-              MCC {BLOCKED_PURCHASE.mcc} is not in allowed_mccs [5074]. Budget unchanged.
+              {declineReason
+                ? `${declineReason.charAt(0).toUpperCase()}${declineReason.slice(1)}. Budget unchanged.`
+                : `MCC ${BLOCKED_PURCHASE.mcc} is not in allowed_mccs [5074]. Budget unchanged.`}
             </p>
           </div>
         </div>

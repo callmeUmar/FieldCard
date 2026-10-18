@@ -122,7 +122,23 @@ export interface Merchant {
   mcc: string
 }
 
+export interface Receipt {
+  id: string
+  jobId: string
+  transactionId: string | null
+  store: string
+  totalCents: number | null
+  items: string[]
+  /** Items not in the job's planned materials, with the reason */
+  flags: string[]
+}
+
+/** Where the snapshot came from: the deployed backend, or bundled mock data */
+export type DataSource = 'live' | 'offline'
+
 export interface DashboardSnapshot {
+  source?: DataSource
+  receipts?: Receipt[]
   company: Company
   workers: Worker[]
   jobs: Job[]

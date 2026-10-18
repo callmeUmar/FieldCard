@@ -1,4 +1,4 @@
-import { ArrowRight, Check, CheckCircle2, Clock3, Loader2, ShieldCheck, X, XCircle } from 'lucide-react'
+import { ArrowRight, Check, CheckCircle2, Clock3, Loader2, MessageSquareText, ShieldCheck, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useDashboard } from '../context/DashboardContext'
 import { formatCurrencyPrecise, formatRelativeTime, jobRemainingCents } from '../lib/format'
@@ -23,7 +23,7 @@ export function ApprovalQueue({
   jobs: Job[]
   workers: Worker[]
 }) {
-  const { approve, decline, data } = useDashboard()
+  const { approve, decline, data, source } = useDashboard()
   const [busy, setBusy] = useState<{ id: string; action: 'approve' | 'decline' } | null>(null)
   const [lastDecision, setLastDecision] = useState<Decision | null>(null)
 
@@ -157,6 +157,13 @@ export function ApprovalQueue({
                   </div>
                 </div>
 
+                {source === 'live' ? (
+                  <p className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5 text-[13px] text-slate-600">
+                    <MessageSquareText className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                    {data?.company.ownerName ?? 'The owner'} was texted and decides by replying <strong className="font-semibold text-slate-900">YES</strong> or{' '}
+                    <strong className="font-semibold text-slate-900">NO</strong>. This list updates when they answer.
+                  </p>
+                ) : (
                 <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5 sm:flex-row sm:justify-end">
                   <Button variant="secondary" disabled={isBusy} onClick={() => handle(txn, 'decline')} className="min-h-10">
                     {isBusy && busy?.action === 'decline' ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
@@ -167,6 +174,7 @@ export function ApprovalQueue({
                     {isBusy && busy?.action === 'approve' ? 'Approving…' : `Approve ${usd(txn.amountCents)}`}
                   </Button>
                 </div>
+                )}
               </li>
             )
           })}
