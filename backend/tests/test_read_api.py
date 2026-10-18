@@ -39,7 +39,7 @@ def snapshot_counts():
 def test_reads_never_write():
     issue_card()
     before = snapshot_counts()
-    for path in ["/api/company", "/api/workers", "/api/merchants", "/api/jobs", "/api/jobs/job_henderson",
+    for path in ["/api/overview", "/api/company", "/api/workers", "/api/merchants", "/api/jobs", "/api/jobs/job_henderson",
                  "/api/jobs/job_henderson/burn", "/api/cards", "/api/requests", "/api/approvals",
                  "/api/transactions", "/api/receipts", "/api/activity", "/api/dashboard"]:
         get(path)
@@ -125,3 +125,18 @@ def test_demo_request_card_is_dev_only(monkeypatch):
     monkeypatch.setenv("MESSAGING", "photon")
     body = {"worker_id": "w_mike", "job_id": "job_henderson", "merchant_name": "Ferguson", "amount_usd": 10}
     assert client.post("/api/dev/request-card", json=body).status_code == 404
+
+
+def test_overview_numbers_and_latest_card():
+    empty = get("/api/overview")
+    assert empty == {"spent_usd": 3410, "budget_usd": 5600, "cards_issued_today": 0, "blocked_today": 0,
+                     "tracked_today_usd": 0, "latest_card": None}
+    issue_card(160)  # $200 cap
+    client.post("/api/simulate/purchase", json={"worker_id": "w_mike", "merchant_name": "Home Depot", "amount": 160})
+    client.post("/api/simulate/purchase", json={"worker_id": "w_mike", "merchant_name": "Ferguson", "amount": 160})
+    o = get("/api/overview")
+    assert (o["spent_usd"], o["cards_issued_today"], o["blocked_today"], o["tracked_today_usd"]) == (3570, 1, 1, 160)
+    card = o["latest_card"]
+    assert (card["merchant"], card["job_name"], card["job_code"], card["amount_cap_usd"], card["state"]) == (
+        "Ferguson", "Henderson Repipe", "HEN-01", 200, "used")
+    assert 3.9 <= card["hours_left"] <= 4
