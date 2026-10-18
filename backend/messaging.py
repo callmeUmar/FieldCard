@@ -62,8 +62,23 @@ async def photon_webhook(request: Request):
 # dropped when the webhook router was added in 8ecc4f8).
 import requests  # noqa: E402
 
+import contextvars  # noqa: E402
+from contextlib import contextmanager  # noqa: E402
+
 # Fallback store for local testing
 DEV_OUTBOX = []
+
+_suppressed = contextvars.ContextVar("sms_suppressed", default=False)
+
+
+@contextmanager
+def suppressed():
+    """No SMS leaves the server inside this block (used by the /ai/audit sandbox)."""
+    token = _suppressed.set(True)
+    try:
+        yield
+    finally:
+        _suppressed.reset(token)
 
 def parse_inbound(payload: dict) -> dict:
     """Extracts standard fields from Photon webhook payloads."""
@@ -105,6 +120,9 @@ def photon_send(to_phone: str, text: str) -> None:
 
 def send_text(to_phone: str, text: str) -> None:
     """Routes text via Photon or logs to dev outbox."""
+    if _suppressed.get():
+        print(f"[SMS suppressed (sandbox) -> {len(text)} chars]")
+        return
     DEV_OUTBOX.append({"to": to_phone, "text": text})
     
     if os.environ.get("MESSAGING", "dev") == "dev":
