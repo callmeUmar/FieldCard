@@ -134,7 +134,8 @@ export const initialSnapshot: DashboardSnapshot = {
       amountCents: 22_890,
       status: 'approved',
       cardLastFour: '4821',
-      createdAt: hoursAgo(2),
+      // Card 4821 was issued 1h ago; an authorization needs an active card
+      createdAt: hoursAgo(0.75),
       isSimulated: false,
       policyDecisionId: 'pol-1',
     },
@@ -144,10 +145,11 @@ export const initialSnapshot: DashboardSnapshot = {
       workerId: 'w_priya',
       merchant: 'Pacific Plumbing Supply',
       mcc: '5074',
-      amountCents: 68_400,
+      // Within Priya's $300 limit, card 9034's $200 cap and the $250 auto-approve threshold
+      amountCents: 18_400,
       status: 'approved',
       cardLastFour: '9034',
-      createdAt: hoursAgo(5),
+      createdAt: hoursAgo(1.5),
       isSimulated: false,
       policyDecisionId: 'pol-2',
     },
@@ -160,7 +162,7 @@ export const initialSnapshot: DashboardSnapshot = {
       amountCents: 12_400,
       status: 'approved',
       cardLastFour: '7712',
-      createdAt: hoursAgo(8),
+      createdAt: hoursAgo(0.4),
       isSimulated: false,
       policyDecisionId: 'pol-3',
     },
@@ -212,7 +214,7 @@ export const initialSnapshot: DashboardSnapshot = {
       type: 'purchase',
       title: 'Purchase approved',
       description: 'Ferguson Plumbing Supply — $228.90 on Henderson kitchen remodel',
-      timestamp: hoursAgo(2),
+      timestamp: hoursAgo(0.75),
       jobId: 'job_henderson',
       transactionId: 'txn-1',
     },
@@ -229,7 +231,8 @@ export const initialSnapshot: DashboardSnapshot = {
       type: 'card_issued',
       title: 'Virtual card issued',
       description: 'Card •••• 9034 — $200 limit for Ortega water heater swap',
-      timestamp: hoursAgo(5.5),
+      // Same moment as card_ort.issuedAt
+      timestamp: hoursAgo(2),
       jobId: 'job_ortega',
     },
     {
@@ -255,7 +258,8 @@ export const initialSnapshot: DashboardSnapshot = {
       type: 'budget_alert',
       title: 'Budget threshold',
       description: 'ORT-0988 at 99% of materials budget ($20 remaining)',
-      timestamp: hoursAgo(12),
+      // Raised by the Pacific purchase that left $20 remaining
+      timestamp: hoursAgo(1.4),
       jobId: 'job_ortega',
     },
     {
@@ -263,7 +267,7 @@ export const initialSnapshot: DashboardSnapshot = {
       type: 'sms',
       title: 'SMS from Luis',
       description: '“Picking up drains for CHN-1051 from Ferguson.”',
-      timestamp: hoursAgo(8),
+      timestamp: hoursAgo(0.6),
       jobId: 'job_chen',
     },
   ],
@@ -274,7 +278,7 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job_henderson',
       approved: true,
       summary: 'Within job budget and approved merchant category',
-      evaluatedAt: hoursAgo(2),
+      evaluatedAt: hoursAgo(0.75),
       rules: [
         {
           ruleId: 'r-budget',
@@ -300,7 +304,7 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job_ortega',
       approved: true,
       summary: 'Water heater materials within tight budget',
-      evaluatedAt: hoursAgo(5),
+      evaluatedAt: hoursAgo(1.5),
       rules: [
         {
           ruleId: 'r-budget',
@@ -326,14 +330,14 @@ export const initialSnapshot: DashboardSnapshot = {
       jobId: 'job_chen',
       approved: true,
       summary: 'Rough-in materials approved',
-      evaluatedAt: hoursAgo(8),
+      evaluatedAt: hoursAgo(0.4),
       rules: [
         {
           ruleId: 'r-budget',
           title: 'Materials budget',
           description: 'Spend must not exceed remaining job materials budget',
           passed: true,
-          detail: '$1,376.00 remaining after purchase',
+          detail: '$1,380.00 remaining after purchase',
         },
         {
           ruleId: 'r-worker-limit',
