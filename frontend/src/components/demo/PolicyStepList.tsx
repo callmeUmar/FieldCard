@@ -1,5 +1,6 @@
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import type { PolicyRuleHit } from '../../types'
+import { DrawnMark } from './DrawnMark'
 
 export function PolicyStepList({
   rules,
@@ -29,9 +30,9 @@ export function PolicyStepList({
             {pending ? (
               <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-slate-400" />
             ) : rule.passed ? (
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+              <DrawnMark kind="check" className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
             ) : (
-              <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+              <DrawnMark kind="cross" className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
             )}
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900">{rule.title}</p>

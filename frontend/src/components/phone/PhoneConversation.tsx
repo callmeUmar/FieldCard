@@ -74,15 +74,27 @@ function phaseToVisible(phase: PhoneConversationPhase): {
   }
 }
 
+/** In-thread card: the same graphite, chip and SANDBOX language as the landing's 3D card. */
 function MiniSandboxCard({ lastFour = '4821' }: { lastFour?: string }) {
   return (
-    <div className="mt-2 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-3 text-white shadow-lg">
-      <p className="text-[9px] uppercase tracking-widest text-slate-400">Sandbox card</p>
-      <p className="mt-1 font-mono text-sm tracking-wider">•••• {lastFour}</p>
-      <p className="mt-2 text-[10px] text-slate-300">
-        Cap {formatCurrencyPrecise(PARSED_REQUEST.amountCents)} · MCC 5074
+    <div className="relative mt-2 overflow-hidden rounded-xl bg-[linear-gradient(135deg,#2b2d34_0%,#15161b_55%,#1c1b27_100%)] p-3 text-white shadow-lg ring-1 ring-white/10">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-indigo-500 text-[7px] font-bold">FC</span>
+          Fieldcard
+        </span>
+        <span className="rounded-full border border-amber-300/60 bg-amber-300/10 px-1.5 py-px font-mono text-[8px] font-bold tracking-widest text-amber-200">
+          SANDBOX
+        </span>
+      </div>
+      <div className="mt-2 h-4 w-6 rounded-[4px] bg-gradient-to-br from-[#f4e5b2] via-[#c9aa63] to-[#ecd99f] ring-1 ring-black/10" />
+      <p className="mt-2 font-mono text-[13px] tracking-[0.18em]">
+        •••• <span className="font-semibold">{lastFour}</span>
       </p>
-      <p className="mt-1 text-[9px] text-indigo-200/90">Simulation — not a live Visa card</p>
+      <p className="mt-1.5 text-[10px] text-slate-300">
+        Cap {formatCurrencyPrecise(PARSED_REQUEST.amountCents)} · MCC 5074 · 4h
+      </p>
+      <p className="mt-0.5 text-[9px] text-indigo-200/90">Simulation — not a live Visa card</p>
     </div>
   )
 }
@@ -96,7 +108,7 @@ export function PhoneConversation({
   cinematicPurchaseBeat = false,
   cardLastFour,
   hideReplay = false,
-  emptyHint = 'Simulated SMS thread · tap Start on the right',
+  emptyHint = 'Simulated SMS thread · press Start simulation',
 }: {
   mode?: 'autoplay' | 'controlled' | 'hero-intro'
   phase?: PhoneConversationPhase
@@ -243,28 +255,31 @@ export function PhoneConversation({
 
   return (
     <div className={className}>
-      <IPhoneFrame heroEntrance={heroEntrance}>
-        <div className="flex h-full min-h-0 flex-col bg-[#f2f2f7]">
-          <div className="shrink-0 border-b border-black/5 bg-[#f2f2f7]/95 px-4 py-2 backdrop-blur-sm">
-            <p className="text-center text-xs font-semibold text-black">Fieldcard</p>
-            <p className="text-center text-[10px] text-black/50">{DEMO_CONTEXT.company}</p>
+      <IPhoneFrame heroEntrance={heroEntrance} statusBarTheme="light" dark>
+        <div className="flex h-full min-h-0 flex-col bg-black">
+          <div className="flex shrink-0 flex-col items-center border-b border-white/10 bg-[#0b0b0d]/95 px-4 pb-2 pt-1 backdrop-blur-sm">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#7c7cf8] to-[#4338ca] text-[10px] font-bold text-white">
+              FC
+            </span>
+            <p className="mt-1 text-center text-xs font-semibold text-white">Fieldcard</p>
+            <p className="text-center text-[10px] text-white/50">{DEMO_CONTEXT.company}</p>
           </div>
           <div
             ref={scrollRef}
-            className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-3 phone-messages-scroll"
+            className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-3 py-3 phone-messages-scroll"
             aria-live="polite"
           >
             {messagesEmpty ? (
-              <p className="py-8 text-center text-[11px] text-black/40">
+              <p className="py-8 text-center text-[11px] text-white/45">
                 {emptyHint}
               </p>
             ) : (
               <>
-                <p className="text-center text-[10px] text-black/40">Today 9:41 AM · Simulated SMS</p>
+                <p className="text-center text-[10px] text-white/45">Simulated SMS · Today 9:41 AM</p>
 
                 {visible.worker && (
                   <div className="phone-msg-in flex justify-end">
-                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[#007aff] px-3 py-2 text-[13px] leading-snug text-white shadow-sm">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-b from-[#1a8cff] to-[#0a74ea] px-3 py-2 text-[14px] leading-snug text-white shadow-sm">
                       {SMS_WORKER_MESSAGE}
                     </div>
                   </div>
@@ -272,7 +287,7 @@ export function PhoneConversation({
 
                 {visible.typing && (
                   <div className="flex justify-start">
-                    <div className="typing-bubble rounded-2xl rounded-bl-md bg-[#e5e5ea] px-3 py-2.5">
+                    <div className="typing-bubble rounded-2xl rounded-bl-md bg-[#26262a] px-3 py-2.5">
                       <span className="typing-dot" />
                       <span className="typing-dot" />
                       <span className="typing-dot" />
@@ -282,7 +297,7 @@ export function PhoneConversation({
 
                 {visible.agentChecking && (
                   <div className="phone-msg-in flex justify-start">
-                    <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-[#e5e5ea] px-3 py-2 text-[13px] leading-snug text-black shadow-sm">
+                    <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-[#26262a] px-3 py-2 text-[14px] leading-snug text-[#f2f2f7] shadow-sm">
                       {SMS_AGENT_CHECKING}
                     </div>
                   </div>
@@ -290,7 +305,7 @@ export function PhoneConversation({
 
                 {visible.policy && (
                   <div className="phone-msg-in flex justify-center">
-                    <div className="flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[11px] font-medium text-indigo-800">
+                    <div className="flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/15 px-3 py-1.5 text-[11px] font-medium text-indigo-100">
                       <span className="policy-spinner h-3 w-3 rounded-full border-2 border-indigo-300 border-t-indigo-600" />
                       Policy engine running…
                     </div>
@@ -299,7 +314,7 @@ export function PhoneConversation({
 
                 {visible.agentApproved && (
                   <div className="phone-msg-in flex justify-start">
-                    <div className="max-w-[90%] rounded-2xl rounded-bl-md bg-[#e5e5ea] px-3 py-2 text-[13px] leading-snug text-black shadow-sm">
+                    <div className="max-w-[90%] rounded-2xl rounded-bl-md bg-[#26262a] px-3 py-2 text-[14px] leading-snug text-[#f2f2f7] shadow-sm">
                       {SMS_AGENT_APPROVED}
                     </div>
                   </div>
@@ -313,7 +328,7 @@ export function PhoneConversation({
 
                 {visible.purchaseApproved && (
                   <div className="phone-msg-in flex justify-center">
-                    <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-[11px] font-semibold text-emerald-200">
                       <CreditCard className="h-3.5 w-3.5" />
                       Purchase approved · Ferguson
                     </div>
@@ -322,7 +337,7 @@ export function PhoneConversation({
 
                 {visible.purchaseDeclined && (
                   <div className="phone-msg-in flex justify-center">
-                    <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-800">
+                    <div className="flex items-center gap-2 rounded-xl border border-rose-400/40 bg-rose-500/15 px-3 py-2 text-[11px] font-semibold text-rose-200">
                       <Shield className="h-3.5 w-3.5" />
                       Blocked · MCC 5200 not allowed
                     </div>

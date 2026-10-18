@@ -1,5 +1,6 @@
 .landing-root {
-  --landing-bg: #060a14;
+  /* graphite, matching the cinematic stage so the film flows into the page */
+  --landing-bg: #060709;
   --landing-indigo: #4f46e5;
   --landing-electric: #6366f1;
   --landing-periwinkle: #a5b4fc;
@@ -7,74 +8,10 @@
   color: #e8ecf4;
 }
 
-/* Grid lives on a pseudo-element so its fade mask never applies to page content */
-.landing-grid-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(148, 163, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 255, 0.07) 1px, transparent 1px);
-  background-size: 48px 48px;
-  background-position: center top;
-  mask-image: linear-gradient(to bottom, black 0%, black 60%, transparent 100%);
-}
-
-/* Hero phone sized against viewport height so the headline and CTAs stay in view */
-.landing-hero-phone {
-  width: clamp(240px, calc((100vh - 290px) * 0.4613), 300px);
-  margin-inline: auto;
-}
-
-@supports (height: 100svh) {
-  .landing-hero-phone {
-    width: clamp(240px, calc((100svh - 290px) * 0.4613), 300px);
-  }
-}
-
-.landing-hero-glow {
-  background:
-    radial-gradient(ellipse 80% 55% at 20% 0%, rgba(99, 102, 241, 0.28), transparent 65%),
-    radial-gradient(ellipse 60% 45% at 85% 15%, rgba(165, 180, 252, 0.12), transparent 55%);
-}
-
 .landing-glass {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
-}
-
-.landing-float-card-inner {
-  background: rgba(12, 18, 36, 0.72);
-  border: 1px solid rgba(165, 180, 252, 0.15);
-  box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(10px);
-}
-
-.landing-float-visible {
-  animation: landing-float-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.landing-float-1 {
-  animation-delay: 0.1s;
-}
-.landing-float-2 {
-  animation-delay: 0.25s;
-}
-.landing-float-3 {
-  animation-delay: 0.4s;
-}
-
-@keyframes landing-float-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .phone-perspective {
@@ -217,7 +154,6 @@
   .phone-hero-enter,
   .phone-msg-in,
   .phone-notification-in,
-  .landing-float-visible,
   .purchase-result-in,
   .typing-dot,
   .policy-spinner {
@@ -233,4 +169,36 @@
   .phone-device {
     transform: rotateY(-4deg) rotateX(2deg);
   }
+}
+
+/* Editorial section language shared with the cinematic story */
+.landing-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font: 600 11px/1.2 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.landing-kicker::before {
+  content: '';
+  width: 28px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.landing-h2 {
+  max-width: 40rem;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  color: #f5f6f8;
+  text-wrap: balance;
+}
+
+.text-center .landing-h2 {
+  margin-inline: auto;
 }

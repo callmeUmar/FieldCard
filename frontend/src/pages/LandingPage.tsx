@@ -1,14 +1,14 @@
-import { ArrowRight, MessageSquare, Shield, Sparkles, Wallet } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { CinematicStory } from '../components/landing/cinematic/CinematicStory'
 import { LandingDashboardPreview } from '../components/landing/LandingDashboardPreview'
-import { LandingHeroShowcase } from '../components/landing/LandingHeroShowcase'
-import { ScrollToControlSection } from '../components/landing/ScrollToControlSection'
+import { PolicyStack } from '../components/landing/PolicyStack'
 import '../styles/landing.css'
 
 export function LandingPage() {
   return (
-    <div className="landing-root min-h-screen">
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
+    <div className="landing-root relative min-h-screen">
+      <header className="absolute inset-x-0 top-0 z-30 mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
         <Link to="/landing" className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-sm font-bold">
             FC
@@ -20,157 +20,89 @@ export function LandingPage() {
             to="/live-demo"
             className="hidden text-sm font-medium text-white/70 transition hover:text-white sm:inline"
           >
-            Live Demo
+            Live demo
           </Link>
           <Link
             to="/"
             className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium transition hover:bg-white/10"
           >
-            Open Dashboard
+            Open dashboard
           </Link>
         </nav>
       </header>
 
-      <section className="landing-hero-glow landing-grid-bg relative overflow-hidden px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-12">
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300/80">
-              DubHacks 2026 · Sandbox demo
-            </p>
-            <h1 className="mt-5 text-[2.65rem] font-semibold leading-[1.02] tracking-[-0.03em] text-white sm:text-5xl lg:text-[3.5rem]">
-              Field spend,
-              <br />
-              <span className="bg-gradient-to-r from-white via-indigo-100 to-[#a5b4fc] bg-clip-text text-transparent">
-                orchestrated by text.
-              </span>
-            </h1>
-            <p className="mt-6 text-lg leading-relaxed text-white/65">
-              Workers request materials by text. Fieldcard handles spending rules,
-              approvals, virtual cards, and live job costing — without another app to
-              install.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/live-demo"
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-400"
-              >
-                Watch Live Demo
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                to="/"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                Open Dashboard
-              </Link>
-            </div>
-            <p className="mt-6 text-xs text-white/40">
-              Simulated SMS and sandbox cards in demo mode — not live Visa authorization.
-            </p>
-          </div>
-          <div className="relative flex justify-center lg:justify-end lg:pr-4">
-            <div
-              className="pointer-events-none absolute -inset-12 rounded-full bg-indigo-500/15 blur-3xl"
-              aria-hidden
-            />
-            <LandingHeroShowcase />
-          </div>
-        </div>
-      </section>
+      <CinematicStory />
 
-      <ScrollToControlSection />
+      <PolicyStack />
 
-      <section className="border-t border-white/5 px-4 py-20 sm:px-6">
+      <section className="px-4 pb-20 pt-24 sm:px-6 sm:pt-28">
         <div className="mx-auto max-w-6xl">
-          <h2 className="text-center text-2xl font-semibold text-white sm:text-3xl">
-            How it works
-          </h2>
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <p className="landing-kicker">How it works</p>
+          <h2 className="landing-h2 mt-4">Three steps. No new app.</h2>
+          <ol className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
             {[
               {
-                icon: MessageSquare,
                 title: 'Text',
                 body: 'Mike texts what he needs, where, and for which job. No new app.',
               },
               {
-                icon: Shield,
                 title: 'Approve',
                 body: 'Policy checks budget, worker limits, and MCC rules — then issues a sandbox card.',
               },
               {
-                icon: Wallet,
                 title: 'Track',
                 body: 'Dana sees spend, approvals, and activity on every job in real time.',
               },
-            ].map((item) => (
-              <div key={item.title} className="landing-glass rounded-2xl p-6">
-                <item.icon className="h-6 w-6 text-indigo-300" strokeWidth={1.5} />
-                <h3 className="mt-4 text-lg font-semibold text-white">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">{item.body}</p>
-              </div>
+            ].map((item, i) => (
+              <li key={item.title} className="border-t border-white/10 pt-6">
+                <p className="font-mono text-xs font-semibold tracking-[0.2em] text-white/40">
+                  {String(i + 1).padStart(2, '0')}
+                </p>
+                <h3 className="mt-3 text-xl font-semibold tracking-tight text-white">{item.title}</h3>
+                <p className="mt-2 max-w-sm text-[15px] leading-relaxed text-white/55">{item.body}</p>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
-      <section className="border-t border-white/5 px-4 py-20 sm:px-6">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+      <section className="px-4 py-20 sm:px-6">
+        <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
           <div>
-            <h2 className="text-2xl font-semibold text-white sm:text-3xl">
-              Built for the field
-            </h2>
-            <p className="mt-4 text-white/60 leading-relaxed">
+            <p className="landing-kicker">Built for the field</p>
+            <h2 className="landing-h2 mt-4">Controls that work at the counter.</h2>
+            <p className="mt-5 max-w-md leading-relaxed text-white/60">
               Plumbers and HVAC techs will not stop for expense software. Fieldcard meets
               them in SMS, enforces your rules automatically, and keeps job costing accurate
               while they stay on the tools.
             </p>
           </div>
-          <div className="landing-glass rounded-2xl p-6">
-            <ul className="space-y-4 text-sm text-white/70">
-              <li className="flex gap-3">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                Single-use virtual cards locked to amount and merchant category (MCC)
-              </li>
-              <li className="flex gap-3">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                4-hour expiry on sandbox cards — tight control per request
-              </li>
-              <li className="flex gap-3">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                Owner approvals when spend crosses your threshold
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t border-white/5 px-4 py-20 sm:px-6">
-        <div className="mx-auto max-w-6xl">
-          <h2 className="text-2xl font-semibold text-white sm:text-3xl">
-            Control every dollar
-          </h2>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
             {[
-              ['Job budgets', 'HEN-1042 · $790 remaining'],
+              ['Single-use virtual cards', 'Locked to the approved amount and merchant category (MCC)'],
+              ['4-hour expiry', 'Sandbox cards close themselves — tight control per request'],
+              ['Job budgets', 'Every card and purchase is tied to a job code'],
               ['Worker limits', 'Mike · $300 per purchase'],
-              ['Merchant rules', 'allowed_mccs on each card'],
-              ['Auto-approve', 'Under owner threshold'],
+              ['Merchant rules', 'allowed_mccs enforced on each card'],
+              ['Owner approvals', 'Auto-approve under your threshold, review above it'],
             ].map(([title, sub]) => (
-              <div key={title} className="landing-glass rounded-xl p-4">
-                <p className="font-semibold text-white">{title}</p>
-                <p className="mt-1 text-xs text-white/50">{sub}</p>
+              <div key={title} className="flex gap-4 py-4">
+                <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-400" strokeWidth={2.25} aria-hidden />
+                <div className="sm:flex sm:w-full sm:items-baseline sm:justify-between sm:gap-6">
+                  <dt className="font-medium text-white sm:whitespace-nowrap">{title}</dt>
+                  <dd className="mt-1 text-sm text-white/50 sm:mt-0 sm:text-right">{sub}</dd>
+                </div>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
       </section>
 
-      <section className="border-t border-white/5 px-4 py-20 sm:px-6">
+      <section className="px-4 py-20 sm:px-6">
         <div className="mx-auto max-w-6xl">
-          <h2 className="text-2xl font-semibold text-white sm:text-3xl">
-            Complete visibility
-          </h2>
-          <p className="mt-3 max-w-2xl text-white/55">
+          <p className="landing-kicker">The owner dashboard</p>
+          <h2 className="landing-h2 mt-4">Complete visibility.</h2>
+          <p className="mt-4 max-w-2xl leading-relaxed text-white/55">
             The same dashboard your team uses in the demo — budgets, approvals, and a live
             activity feed.
           </p>
@@ -180,27 +112,28 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-white/5 px-4 py-24 sm:px-6">
+      <section className="px-4 py-28 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+          <h2 className="landing-h2">
             Stop chasing receipts.
             <br />
-            Start controlling spend.
+            <span className="text-white/55">Start controlling spend.</span>
           </h2>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
-            <Link
-              to="/live-demo"
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400"
-            >
-              Watch Demo
+            <Link to="/live-demo" className="cine-cta-button">
+              Try the interactive demo
+              <ArrowRight className="cine-cta-arrow h-4 w-4" />
             </Link>
             <Link
               to="/"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-6 py-3.5 text-sm font-semibold text-white hover:bg-white/5"
+              className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/15 px-6 text-sm font-semibold text-white transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
             >
-              Open Dashboard
+              Open dashboard
             </Link>
           </div>
+          <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+            Sandbox simulation · no real payments
+          </p>
         </div>
       </section>
 
@@ -208,7 +141,7 @@ export function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
           <p className="text-sm text-white/40">© Fieldcard · DubHacks 2026 demo</p>
           <div className="flex gap-6 text-sm text-white/50">
-            <Link to="/live-demo" className="hover:text-white">Live Demo</Link>
+            <Link to="/live-demo" className="hover:text-white">Live demo</Link>
             <Link to="/" className="hover:text-white">Dashboard</Link>
           </div>
         </div>

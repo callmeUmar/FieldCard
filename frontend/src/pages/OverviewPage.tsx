@@ -105,7 +105,7 @@ export function OverviewPage() {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid items-start gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader
             title="Active jobs"
@@ -159,7 +159,7 @@ export function OverviewPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2">
         <ApprovalQueue
           transactions={transactions}
           jobs={jobs}

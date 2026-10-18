@@ -8,6 +8,7 @@ export function IPhoneFrame({
   statusBarTheme = 'dark',
   fullBleed = false,
   hideIslandOverlap = false,
+  dark = false,
 }: {
   children: ReactNode
   className?: string
@@ -17,6 +18,8 @@ export function IPhoneFrame({
   /** Child covers entire screen (lock screen); status bar overlays on top */
   fullBleed?: boolean
   hideIslandOverlap?: boolean
+  /** Dark-mode screen (black), matching the landing page's device */
+  dark?: boolean
 }) {
   return (
     <div
@@ -63,7 +66,7 @@ export function IPhoneFrame({
           {/* Screen bezel */}
           <div className="relative overflow-hidden rounded-[2.75rem] bg-black p-[2px]">
             <div
-              className="phone-screen relative flex aspect-[393/852] w-full flex-col overflow-hidden bg-[#f2f2f7]"
+              className={`phone-screen relative flex aspect-[393/852] w-full flex-col overflow-hidden ${dark ? 'bg-black' : 'bg-[#f2f2f7]'}`}
             >
               <div
                 className="pointer-events-none absolute inset-0 z-30 bg-gradient-to-br from-white/25 via-transparent to-transparent opacity-40"

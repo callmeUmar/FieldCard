@@ -1,7 +1,15 @@
+import { Activity, ArrowRight, MessageSquareText, ShieldCheck, Stamp } from 'lucide-react'
 import { TransactionSimulator } from '../components/TransactionSimulator'
 import { TransactionRow } from '../components/TransactionRow'
 import { useDashboard } from '../context/DashboardContext'
 import { Card, CardHeader } from '../components/ui/Card'
+
+const SIM_FLOW = [
+  { label: 'Request', icon: MessageSquareText },
+  { label: 'Policy evaluation', icon: ShieldCheck },
+  { label: 'Decision', icon: Stamp },
+  { label: 'Activity update', icon: Activity },
+]
 
 export function SimulatorPage() {
   const { data, loading } = useDashboard()
@@ -25,6 +33,20 @@ export function SimulatorPage() {
           Test approve, decline, and pending flows for the live demo. All simulator
           charges are clearly marked.
         </p>
+        <ol className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2 text-xs font-medium text-slate-600" aria-label="How a simulated purchase flows">
+          {SIM_FLOW.map((step, i) => (
+            <li key={step.label} className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 shadow-sm">
+                <step.icon className="h-3.5 w-3.5 text-indigo-500" strokeWidth={2} aria-hidden />
+                {step.label}
+              </span>
+              {i < SIM_FLOW.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-slate-300" aria-hidden />}
+            </li>
+          ))}
+          <li className="ml-1 rounded-full bg-violet-50 px-2.5 py-1 text-violet-700 ring-1 ring-violet-600/15">
+            Sandbox only · no real charges
+          </li>
+        </ol>
       </div>
 
       <div>

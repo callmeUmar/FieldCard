@@ -9,7 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDashboard } from '../../context/DashboardContext'
 import { Badge } from '../ui/Badge'
 
@@ -30,6 +30,7 @@ const nav: {
 ]
 
 export function AppShell() {
+  const location = useLocation()
   const { data } = useDashboard()
   const [mobileOpen, setMobileOpen] = useState(false)
   const pending = data?.metrics.pendingApprovals ?? 0
@@ -65,9 +66,9 @@ export function AppShell() {
               end={item.end}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 ${
                   isActive
-                    ? 'bg-white/10 text-white'
+                    ? 'bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-indigo-400'
                     : item.highlight
                       ? 'text-indigo-200 hover:bg-indigo-500/20 hover:text-white'
                       : 'text-slate-300 hover:bg-white/5 hover:text-white'
@@ -106,7 +107,7 @@ export function AppShell() {
         <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200/80 bg-white/80 px-4 backdrop-blur-md lg:px-8">
           <button
             type="button"
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+            className="rounded-lg p-2.5 text-slate-600 hover:bg-slate-100 lg:hidden"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
           >
@@ -140,7 +141,10 @@ export function AppShell() {
         </header>
 
         <main className="flex-1 p-4 lg:p-8">
-          <Outlet />
+          {/* Keyed by route so each page arrives with a short, reduced-motion-safe reveal */}
+          <div key={location.pathname} className="animate-fade-in-up">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
