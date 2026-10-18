@@ -66,3 +66,26 @@ spend_events(occurred_at TIMESTAMPTZ NOT NULL, company_id TEXT NOT NULL, job_id 
              amount_usd NUMERIC(10,2) NOT NULL, mcc TEXT, result TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'live')
 ```
 `result` is `approved` or `declined`. A hypertable on `occurred_at` when TimescaleDB is available.
+
+## Dashboard read API (`backend/main.py`)
+
+All `GET`, read-only, scoped to `DEMO_COMPANY_ID` (default `co_ballard`, or `?company_id=`). Phones are masked (`•••-•••-1111`), the `/ai/audit` sandbox worker is hidden, and every endpoint returns **503** when MongoDB is unreachable. CORS is open (`CORS_ORIGINS`, default `*`, no credentials).
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/dashboard` | `{company, workers, merchants, jobs, cards, requests, approvals, transactions, receipts, activity}` in one read |
+| `GET /api/company` | company (owner phone masked) |
+| `GET /api/workers` | workers (phones masked) |
+| `GET /api/merchants` | merchants |
+| `GET /api/jobs` | jobs + `remaining_usd`, `committed_usd` (caps of active cards) |
+| `GET /api/jobs/{id}` | job + its `cards`, `requests`, `transactions`, `receipts` |
+| `GET /api/jobs/{id}/burn` | `{budget_usd, spent_usd, baseline_usd, points: [{at, spent_usd, amount_usd, merchant_name}]}` cumulative spend; spend from before tracked purchases is the baseline |
+| `GET /api/cards?state=` | cards + `job_id` (from the card's request) |
+| `GET /api/requests?status=` | card requests with their `policy` result |
+| `GET /api/approvals?status=` | approvals + the joined `request` |
+| `GET /api/transactions?job_id=&limit=` | transactions, newest first |
+| `GET /api/receipts?job_id=` | receipts |
+| `GET /api/activity?limit=&job_id=&since=` | activity, newest first (`since` = ISO time, exclusive) |
+
+Dev-only write (404 unless `MESSAGING=dev`), used by the dashboard's Live Agent Demo:
+`POST /api/dev/request-card {worker_id, job_id, merchant_name, amount_usd, items, text}` runs the real policy engine and card issuing for an already-parsed request (no AI); the worker's previous active card is terminated first. Returns `request_card_flow`'s result plus the issued `card` (or `null`).
