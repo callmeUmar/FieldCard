@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 import agent
 import main
 import messaging
-import seed_dev
+import seed
 from db import mongo, now
 
 client = TestClient(main.app)
@@ -20,7 +20,7 @@ MIKE = "+15550001111"
 def fresh(monkeypatch):
     for name in mongo.list_collection_names():
         mongo.drop_collection(name)
-    seed_dev.seed()
+    seed.seed()
     messaging.DEV_OUTBOX.clear()
     events = []
     monkeypatch.setitem(sys.modules, "tiger", types.SimpleNamespace(record_spend_event=lambda *a: events.append(a)))

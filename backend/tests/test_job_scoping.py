@@ -1,5 +1,5 @@
 """A worker can never act on another company's job, even by passing its id directly."""
-import seed_dev
+import seed
 import agent
 from db import mongo
 
@@ -7,7 +7,7 @@ from db import mongo
 def test_other_company_job_is_treated_as_missing():
     for name in mongo.list_collection_names():
         mongo.drop_collection(name)
-    seed_dev.seed()
+    seed.seed()
     mongo.companies.insert_one(
         {"_id": "co_larsen", "name": "Larsen", "owner_name": "Erik", "owner_phone": "+1777", "approval_threshold_usd": 1}
     )
