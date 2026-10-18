@@ -1,6 +1,9 @@
+import contextvars
 import os
 import re
+import time
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,7 +13,59 @@ from pymongo import MongoClient
 load_dotenv(Path(__file__).with_name(".env"))
 
 # MongoClient connects lazily, so importing this module never touches the network.
-mongo = MongoClient(os.getenv("MONGODB_URI"), tz_aware=True)["fieldcard"]
+_atlas = MongoClient(os.getenv("MONGODB_URI"), tz_aware=True)["fieldcard"]
+_memory = None
+_use_memory = contextvars.ContextVar("use_memory", default=False)
+
+
+def _current():
+    global _memory
+    if not _use_memory.get():
+        return _atlas
+    if _memory is None:
+        import mongomock
+
+        _memory = mongomock.MongoClient(tz_aware=True)["fieldcard"]
+    return _memory
+
+
+class _Database:
+    """Forwards to the real database, or to an in-memory one inside in_memory().
+    Every module does `from db import mongo`, so switching happens here."""
+
+    def __getattr__(self, name):
+        return getattr(_current(), name)
+
+    def __getitem__(self, name):
+        return _current()[name]
+
+
+mongo = _Database()
+
+
+@contextmanager
+def in_memory():
+    """Use the in-memory database for the current request/thread only."""
+    token = _use_memory.set(True)
+    try:
+        yield
+    finally:
+        _use_memory.reset(token)
+
+
+_reachable = {"ok": None, "at": 0.0}
+
+
+def reachable(ttl_s: float = 30) -> bool:
+    """Quick, cached MongoDB ping (1.5s timeout) so callers can fall back."""
+    if _reachable["ok"] is None or time.monotonic() - _reachable["at"] > ttl_s:
+        try:
+            MongoClient(os.getenv("MONGODB_URI"), serverSelectionTimeoutMS=1500).admin.command("ping")
+            _reachable["ok"] = True
+        except Exception:
+            _reachable["ok"] = False
+        _reachable["at"] = time.monotonic()
+    return _reachable["ok"]
 
 
 def now() -> datetime:

@@ -177,6 +177,148 @@ def simulate_purchase(body: SimulatedPurchase):
     return {"status": "approved", "card_id": card["_id"]}
 
 
+# ---------- VEYZL audit endpoint
+# VEYZL posts {"msg", "image" | "imageBase64"} and expects the real model's
+# answer. Text runs through the real agent as sandbox worker w_veyzl (mock
+# cards, no SMS, approvals closed after each call); images run through vision.
+
+import base64  # noqa: E402
+import re  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+from contextlib import nullcontext  # noqa: E402
+
+from fastapi import Request  # noqa: E402
+from starlette.concurrency import run_in_threadpool  # noqa: E402
+
+try:
+    from backend import seed_dev
+except ImportError:
+    import seed_dev
+
+AUDIT_WORKER = {
+    "_id": "w_veyzl",
+    "company_id": "co_ballard",
+    "name": "VEYZL Auditor",
+    "phone": "sandbox:veyzl",  # not a phone number, so nothing can be texted to it
+    "per_purchase_limit_usd": 300,
+}
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+_CARD_NUMBER = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
+_SECRET_VARS = ("GEMINI_API_KEY", "MONGODB_URI", "PHOTON_API_KEY", "PERCEPTRON_API_KEY", "BACKBOARD_API_KEY", "TIGER_DATABASE_URL")
+_audit_lock = threading.Lock()  # one sandbox worker, so audit calls take turns
+
+
+def _scrub(text: str) -> str:
+    text = _CARD_NUMBER.sub("[redacted]", text)
+    for var in _SECRET_VARS:
+        if os.getenv(var):
+            text = text.replace(os.environ[var], "[redacted]")
+    return text
+
+
+def _image_mime(data: bytes) -> str:
+    if data.startswith(b"\x89PNG"):
+        return "image/png"
+    if data.startswith(b"GIF8"):
+        return "image/gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
+def _audit_image(b64: str, msg: str) -> tuple[str, str]:
+    if b64.startswith("data:") and "," in b64:
+        b64 = b64.split(",", 1)[1]  # data:image/png;base64,....
+    b64 = "".join(b64.split())
+    try:
+        data = base64.b64decode(b64 + "=" * (-len(b64) % 4))
+    except Exception:
+        data = b""
+    if not data:
+        return "Couldn't decode the image. Send it as base64 in \"image\" or \"imageBase64\".", "bad-image"
+    if len(data) > MAX_IMAGE_BYTES:
+        return "Image is too large (max 10 MB).", "too-large"
+    answer, source = agent.vision.ask_about_image(data, msg or "Describe this image.", _image_mime(data))
+    return answer or "(The model returned no text.)", source
+
+
+def _end_sandbox_cards() -> None:
+    for card in agent.db.mongo.cards.find({"worker_id": AUDIT_WORKER["_id"], "state": "active"}):
+        agent.provider.terminate_card(card["_id"])
+
+
+def _close_sandbox_approvals() -> None:
+    # Otherwise the owner's next YES could approve an audit request.
+    req_ids = [r["_id"] for r in agent.db.mongo.requests.find({"worker_id": AUDIT_WORKER["_id"]}, {"_id": 1})]
+    agent.db.mongo.approvals.update_many(
+        {"request_id": {"$in": req_ids}, "status": "pending"},
+        {"$set": {"status": "denied", "decided_at": now()}},
+    )
+
+
+def _audit_agent(msg: str) -> tuple[str, str]:
+    mongo_ = agent.db.mongo
+    if mongo_.companies.find_one({"_id": AUDIT_WORKER["company_id"]}) is None:
+        seed_dev.seed()
+    mongo_.workers.replace_one({"_id": AUDIT_WORKER["_id"]}, AUDIT_WORKER, upsert=True)
+    with _audit_lock:
+        _end_sandbox_cards()
+        agent.chats.pop(AUDIT_WORKER["phone"], None)  # each audit call is a fresh conversation
+        started = now()
+        try:
+            reply = agent.handle_worker_message(dict(AUDIT_WORKER), msg)
+        finally:
+            _end_sandbox_cards()
+            _close_sandbox_approvals()
+            agent.chats.pop(AUDIT_WORKER["phone"], None)
+        last = mongo_.requests.find_one(
+            {"worker_id": AUDIT_WORKER["_id"], "created_at": {"$gte": started}}, sort=[("created_at", -1)]
+        )
+    outcome = f"policy={last['status']}" if last else "no card request"
+    if reply is None:  # Gemini failed after a card was issued; details only go by text
+        reply = "A card was issued for this request. Card details are only sent by text."
+    return reply, outcome
+
+
+def _audit(payload: dict) -> dict:
+    started = time.monotonic()
+    msg = str(payload.get("msg") or "").strip()
+    image = payload.get("image") or payload.get("imageBase64")
+    kind, detail, db_mode = "empty", "", "atlas"
+    try:
+        db_mode = "atlas" if agent.db.reachable() else "memory"
+        with agent.db.in_memory() if db_mode == "memory" else nullcontext(), agent.messaging.suppressed():
+            if isinstance(image, str) and image.strip():
+                kind = "image"
+                text, detail = _audit_image(image, msg)
+            elif msg:
+                kind = "agent"
+                text, detail = _audit_agent(msg)
+            else:
+                text = 'Send JSON {"msg": "..."} and optionally "image" or "imageBase64" (base64).'
+    except Exception as e:
+        kind, detail = "error", f"{type(e).__name__} {getattr(e, 'code', '')}".strip()
+        text = "Fieldcard couldn't process this request right now."
+    text = _scrub(text)
+    print(
+        f"[audit] {kind} ({detail}) db={db_mode} msg={msg[:60]!r} "
+        f"-> {len(text)} chars in {time.monotonic() - started:.1f}s"
+    )
+    return {"response": text}
+
+
+@app.post("/ai/audit")
+async def ai_audit(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {"msg": str(payload)}
+    return await run_in_threadpool(_audit, payload)
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
