@@ -298,3 +298,36 @@
 .lx-result-badge {
   background: #d7f5ef;
 }
+
+/* ---------- No background fades anywhere: flat surfaces only ---------- */
+
+/* White sections: no key-light glows */
+.lx-section::before,
+.lx-cta-light,
+.lx-cta-glow {
+  display: none;
+}
+.lx-ctl,
+.lx-hiw,
+.lx-vis {
+  --lx-light: none;
+}
+
+/* The film: one flat dark backdrop, no radial backdrop, vignette, glow or scrims.
+   (The glow element is still animated by the timeline; it just isn't painted.) */
+.landing-root .cine-backdrop {
+  background: #060709;
+}
+.landing-root .cine-vignette,
+.landing-root .cine-overlay::before,
+.landing-root .cine-static-copy {
+  background: none;
+}
+.landing-root .cine-glow {
+  display: none;
+}
+/* Step connector lines: solid accent */
+.lx-hiw-step:not(:last-child)::after,
+.lx-vis-link:not(:last-child)::after {
+  background: #5b5bf0;
+}
