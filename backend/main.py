@@ -192,9 +192,9 @@ from fastapi import Request  # noqa: E402
 from starlette.concurrency import run_in_threadpool  # noqa: E402
 
 try:
-    from backend import seed_dev
+    from backend import seed
 except ImportError:
-    import seed_dev
+    import seed
 
 AUDIT_WORKER = {
     "_id": "w_veyzl",
@@ -260,7 +260,7 @@ def _close_sandbox_approvals() -> None:
 def _audit_agent(msg: str) -> tuple[str, str]:
     mongo_ = agent.db.mongo
     if mongo_.companies.find_one({"_id": AUDIT_WORKER["company_id"]}) is None:
-        seed_dev.seed()
+        seed.seed()
     mongo_.workers.replace_one({"_id": AUDIT_WORKER["_id"]}, AUDIT_WORKER, upsert=True)
     with _audit_lock:
         _end_sandbox_cards()

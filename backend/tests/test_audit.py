@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 import agent
 import main
 import messaging
-import seed_dev
+import seed
 import vision
 from db import in_memory, mongo
 
@@ -42,7 +42,7 @@ class FakeClient:
 def fresh(monkeypatch):
     for name in mongo.list_collection_names():
         mongo.drop_collection(name)
-    seed_dev.seed()
+    seed.seed()
     messaging.DEV_OUTBOX.clear()
     agent.chats.clear()
     monkeypatch.setattr(agent.db, "reachable", lambda: True)

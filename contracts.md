@@ -56,3 +56,13 @@ Database: `fieldcard`. All `_id` values are strings (e.g. `job_henderson`). All 
 read_receipt(image_url: str, planned_materials: list) -> dict
 ```
 Returns `{"store": str, "items": list, "total": float, "flags": list, "ocr_source": str}`. `flags` lists items that are not in `planned_materials`.
+
+## Tiger (`TIGER_DATABASE_URL`)
+
+Postgres/TimescaleDB table written by `seed.py` (backdated history, `source = 'seed'`) and by `tiger.record_spend_event(company_id, job_id, worker_id, amount, mcc, result)` (`source = 'live'`):
+
+```sql
+spend_events(occurred_at TIMESTAMPTZ NOT NULL, company_id TEXT NOT NULL, job_id TEXT, worker_id TEXT,
+             amount_usd NUMERIC(10,2) NOT NULL, mcc TEXT, result TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'live')
+```
+`result` is `approved` or `declined`. A hypertable on `occurred_at` when TimescaleDB is available.
