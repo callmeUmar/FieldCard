@@ -19,18 +19,23 @@ CAP_MULTIPLIER = 1.25
 YES_WORDS = {"YES", "Y", "OK", "APPROVE"}
 NO_WORDS = {"NO", "N", "DENY"}
 
+# Resolve key with fallback
+api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
 # Created only when a key is set, so this module imports without one (tests, main.py).
 # Bounded timeout and retries: when Gemini is overloaded (503) the SDK would
 # otherwise keep retrying and hang the webhook.
 client = (
     genai.Client(
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=api_key,
         http_options=types.HttpOptions(timeout=30_000, retry_options=types.HttpRetryOptions(attempts=3)),
     )
-    if os.getenv("GEMINI_API_KEY")
+    if api_key
     else None
 )
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+
+# Correct production model name
+MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 BUSY_REPLY = "Fieldcard is busy right now. Please text again in a minute."
 SYSTEM_PROMPT = Path(__file__).with_name("system_prompt.txt").read_text()
 provider = cards.get_provider()
