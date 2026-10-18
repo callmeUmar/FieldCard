@@ -39,7 +39,9 @@ provider = cards.get_provider()
 chats: dict[str, object] = {}
 
 
-def handle_worker_message(worker: dict, text: str, image_url: str | None = None) -> str | None:
+def handle_worker_message(
+    worker: dict, text: str, image_url: str | None = None, model: str | None = None
+) -> str | None:
     """Returns the agent's reply, or None when there is nothing more to send
     (Gemini failed after a card was issued; the card text already went out)."""
     if client is None:
@@ -106,7 +108,7 @@ def handle_worker_message(worker: dict, text: str, image_url: str | None = None)
 
     phone = worker["phone"]
     if phone not in chats:
-        chats[phone] = client.chats.create(model=MODEL)
+        chats[phone] = client.chats.create(model=model or MODEL)
 
     message = text or "I sent a receipt photo."
     if text and image_url:
