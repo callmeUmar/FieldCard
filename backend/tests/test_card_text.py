@@ -51,7 +51,7 @@ def mike():
 
 
 def texts_to(phone):
-    return [m["text"] for m in messaging.DEV_OUTBOX if m["to_phone"] == phone]
+    return [m["text"] for m in messaging.DEV_OUTBOX if m["to"] == phone]
 
 
 def test_issued_card_is_texted_from_code():
