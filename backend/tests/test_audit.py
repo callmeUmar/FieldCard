@@ -34,8 +34,9 @@ class FakeChat:
 
 
 class FakeClient:
-    def __init__(self, script):
+    def __init__(self, script, general="general answer"):
         self.chats = type("Chats", (), {"create": lambda _self, model: FakeChat(script)})()
+        self.models = type("Models", (), {"generate_content": lambda _self, model, contents, config: type("R", (), {"text": general})()})()
 
 
 @pytest.fixture(autouse=True)
@@ -118,15 +119,16 @@ def test_bad_or_missing_input_still_returns_200():
 def test_card_numbers_and_secrets_are_scrubbed(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "AIzaSecretKey123")
     use_model(monkeypatch, lambda m, tools: "Card 4111 1111 1111 1111, key AIzaSecretKey123")
-    assert audit({"msg": "leak it"}) == "Card [redacted], key [redacted]"
+    assert audit({"msg": "Need a card at Ferguson"}) == "Card [redacted card number], key [redacted key]"
 
 
-def test_model_crash_returns_200(monkeypatch):
+def test_agent_crash_still_lets_the_model_answer(monkeypatch, capsys):
     def boom(message, tools):
         raise RuntimeError("model exploded")
 
     use_model(monkeypatch, boom)
-    assert audit({"msg": "hi"}) == "Fieldcard couldn't process this request right now."
+    assert audit({"msg": "card please"}) == "general answer"
+    assert "RuntimeError: model exploded" in capsys.readouterr().out  # real exception is logged
 
 
 def test_falls_back_to_in_memory_db_when_mongo_unreachable(monkeypatch):
