@@ -2,12 +2,15 @@ import type { MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CinematicStory } from '../components/landing/cinematic/CinematicStory'
 import { FinalCta } from '../components/landing/FinalCta'
+import { Hero } from '../components/landing/Hero'
 import { HowItWorks } from '../components/landing/HowItWorks'
 import { PolicyStack } from '../components/landing/PolicyStack'
 import { SpendingControls } from '../components/landing/SpendingControls'
 import { VisibilityDemo } from '../components/landing/VisibilityDemo'
 import '../styles/landing.css'
 import '../styles/landing-sections.css'
+// Light theme for the existing sections; loaded last, colors only (no animation changes)
+import '../styles/landing-light.css'
 
 const SECTION_LINKS = [
   ['how-it-works', 'How it works'],
@@ -28,12 +31,10 @@ function scrollToSection(e: MouseEvent<HTMLAnchorElement>, id: string) {
 export function LandingPage() {
   return (
     <div className="landing-root relative min-h-screen">
-      <header className="absolute inset-x-0 top-0 z-30 mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
-        <Link to="/landing" className="lx-brand flex items-center gap-2">
-          <span className="lx-brand-mark flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-sm font-bold">
-            FC
-          </span>
-          <span className="font-semibold tracking-tight">Fieldcard</span>
+      <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
+        <Link to="/landing" className="lx-brand flex items-center gap-2 text-[#0a2540]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-[6px] bg-[#0a2540] text-[14px] font-semibold text-white">F</span>
+          <span className="text-[16px] font-semibold tracking-[-0.01em]">Fieldcard</span>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">
           {SECTION_LINKS.map(([id, label]) => (
@@ -41,14 +42,13 @@ export function LandingPage() {
               {label}
             </a>
           ))}
-          <Link to="/live-demo" className="lx-nav-link hidden sm:inline-flex">
-            Live demo
-          </Link>
-          <Link to="/" className="lx-nav-pill">
-            Open dashboard
+          <Link to="/dashboard" className="lx-nav-pill">
+            Dashboard
           </Link>
         </nav>
       </header>
+
+      <Hero />
 
       <CinematicStory />
 
@@ -62,18 +62,8 @@ export function LandingPage() {
 
       <FinalCta />
 
-      <footer className="border-t border-white/10 px-4 py-10 sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-sm text-white/40">© Fieldcard · DubHacks 2026 demo</p>
-          <div className="flex gap-6 text-sm text-white/50">
-            <Link to="/live-demo" className="lx-footer-link">
-              Live demo
-            </Link>
-            <Link to="/" className="lx-footer-link">
-              Dashboard
-            </Link>
-          </div>
-        </div>
+      <footer className="border-t border-[#e3e8ee] px-4 py-8 sm:px-6">
+        <p className="mx-auto max-w-6xl text-[13px] text-[#697386]">© Fieldcard · DubHacks 2026 demo</p>
       </footer>
     </div>
   )

@@ -39,29 +39,29 @@ export const DECISION_META = `${PARSED_REQUEST.merchant} · MCC ${PARSED_REQUEST
 
 export const BEATS = {
   request: {
-    kicker: '01 · 9:41 AM, Ferguson',
-    title: 'A request arrives by text.',
-    body: `${DEMO_CONTEXT.worker} is at the counter with fittings for the Henderson job. No app to open, no company card in his wallet.`,
+    kicker: '01 · Request',
+    title: 'A text, not an app.',
+    body: `${DEMO_CONTEXT.worker} texts what he needs from the counter.`,
   },
   policy: {
     kicker: '02 · Policy',
-    title: 'Rules run before money moves.',
-    body: `Fieldcard checks the ${PARSED_REQUEST.jobCode} budget (${DEMO_CONTEXT.jobBudgetRemaining} left), ${DEMO_CONTEXT.worker}'s ${DEMO_CONTEXT.workerLimit} limit and the merchant category.`,
+    title: 'Rules run first.',
+    body: `${PARSED_REQUEST.jobCode} budget, ${DEMO_CONTEXT.workerLimit} limit and store type, checked in code.`,
   },
   card: {
     kicker: '03 · Card',
     title: 'One request. One card.',
-    body: 'A single-use virtual card is issued for exactly this purchase — and nothing else.',
+    body: 'Single use, for this purchase only.',
   },
   limits: {
     kicker: '04 · Constraints',
     title: 'Locked to the job.',
-    body: 'Job, cap, merchant category and expiry are written into the card itself.',
+    body: 'Store, amount and four hours, built into the card.',
   },
   payoff: {
     kicker: '06 · Job costing',
     title: 'Every purchase, tied to the right job.',
-    body: `The approved ${AMOUNT} posts to ${PARSED_REQUEST.jobCode} the moment it clears, so the owner's job costing is current before ${DEMO_CONTEXT.worker} leaves the counter.`,
+    body: `${AMOUNT} posts to ${PARSED_REQUEST.jobCode} as it clears.`,
   },
 } as const
 

@@ -207,7 +207,7 @@ export const CONTROLS: Control[] = [
     id: 'budget',
     name: 'Job budget',
     short: `${usd(henderson.materialBudgetCents)} on ${henderson.code}`,
-    statement: 'Every purchase must fit the remaining materials budget of the job it is coded to.',
+    statement: 'Must fit the job’s remaining budget.',
     visual: 'scale',
     pass: {
       ...approvedHere(),
@@ -230,7 +230,7 @@ export const CONTROLS: Control[] = [
     id: 'worker',
     name: 'Worker spending limit',
     short: `${mike.name} ${usd(mike.spendingLimitCents)} · ${luis.name} ${usd(luis.spendingLimitCents)}`,
-    statement: 'Each worker has a per-purchase cap. The same request can pass for one tech and stop for another.',
+    statement: 'Each worker has a per-purchase cap.',
     visual: 'scale',
     pass: {
       ...approvedHere(),
@@ -253,7 +253,7 @@ export const CONTROLS: Control[] = [
     id: 'mcc',
     name: 'Merchant category',
     short: `Card allows MCC ${DEMO_VIRTUAL_CARD.allowedMccs.join(', ')}`,
-    statement: 'Each card carries an allowed_mccs list. Anything outside it is declined at the counter.',
+    statement: 'Only the card’s allowed store types.',
     visual: 'mcc',
     pass: { ...approvedHere(), note: `MCC ${ferguson.mcc} · plumbing supply` },
     fail: {
@@ -278,7 +278,7 @@ export const CONTROLS: Control[] = [
     id: 'threshold',
     name: 'Approval threshold',
     short: `Auto-approve up to ${usd(AUTO_APPROVE_THRESHOLD_CENTS)}`,
-    statement: 'Purchases up to the threshold clear automatically. Anything above it waits for the owner.',
+    statement: 'Above the threshold waits for the owner.',
     visual: 'scale',
     pass: { ...approvedHere(), scale: thresholdScale(AMOUNT), note: 'Under the threshold · clears automatically' },
     fail: {
@@ -297,7 +297,7 @@ export const CONTROLS: Control[] = [
     id: 'single-use',
     name: 'Single-use cards',
     short: 'One authorization per card',
-    statement: `A card is issued for one request at the approved amount (${usd(AMOUNT)}), then retires itself.`,
+    statement: `One card per request, at ${usd(AMOUNT)}.`,
     visual: 'uses',
     pass: { ...approvedHere(), note: 'First authorization on card •••• ' + DEMO_VIRTUAL_CARD.lastFour },
     fail: {
@@ -315,7 +315,7 @@ export const CONTROLS: Control[] = [
     id: 'expiry',
     name: 'Card expiration',
     short: `Closes ${cardHours} hours after issue`,
-    statement: `Sandbox cards expire ${cardHours} hours after issuance, so an unused card cannot linger.`,
+    statement: `Expires ${cardHours} hours after issue.`,
     visual: 'clock',
     pass: { ...approvedHere(), scale: clockScale(HOUR), note: '1 hour after issue' },
     fail: {

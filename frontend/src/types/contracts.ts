@@ -212,3 +212,40 @@ export interface DemoCardResponse {
   store?: string
   card: LiveCardDocument | null
 }
+
+/** GET /api/overview */
+export interface LatestCardDocument {
+  _id: string
+  last4: string
+  merchant: string | null
+  job_id: string | null
+  job_name: string | null
+  job_code: string | null
+  amount_cap_usd: number
+  expires_at: string
+  state: CardState
+  hours_left: number
+}
+
+export interface OverviewResponse {
+  spent_usd: number
+  budget_usd: number
+  cards_issued_today: number
+  blocked_today: number
+  tracked_today_usd: number
+  latest_card: LatestCardDocument | null
+}
+
+/** GET /api/jobs/{id} */
+export interface JobDetailResponse extends LiveJobDocument {
+  cards: LiveCardDocument[]
+  requests: RequestDocument[]
+  transactions: TransactionDocument[]
+  receipts: ReceiptDocument[]
+}
+
+export interface HealthResponse {
+  ok: boolean
+  time: string
+  db: 'ok' | 'error'
+}

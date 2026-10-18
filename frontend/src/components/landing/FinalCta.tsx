@@ -1,4 +1,4 @@
-import { ArrowRight, LayoutDashboard } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useInView } from '../../hooks/useInView'
@@ -62,20 +62,14 @@ export function FinalCta() {
             <span>You stay in control.</span>
           </span>
         </h2>
-        <p className="lx-cta-lede lx-reveal">
-          Follow one request from a text message to a coded purchase in the 90-second interactive demo.
-        </p>
+        <p className="lx-cta-lede lx-reveal">Every card, purchase and approval, live.</p>
         <div className="lx-cta-actions lx-reveal">
-          <Link to="/live-demo" className="lx-btn-primary">
-            Try the interactive demo
+          <Link to="/dashboard" className="lx-btn-primary">
+            Open dashboard and login
             <ArrowRight className="lx-btn-arrow" aria-hidden />
           </Link>
-          <Link to="/" className="lx-btn-secondary">
-            <LayoutDashboard aria-hidden />
-            Open dashboard
-          </Link>
         </div>
-        <p className="lx-cta-note lx-reveal">Sandbox simulation · no real payments</p>
+        <p className="lx-cta-note lx-reveal">Sandbox · no real payments</p>
       </div>
     </section>
   )

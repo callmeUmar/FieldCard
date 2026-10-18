@@ -56,8 +56,7 @@ export function SpendingControls() {
       <div className="lx-container lx-ctl-grid">
         <div>
           <SectionIntro id="ctl-heading" kicker="Spending controls" title="Controls that work at the counter.">
-            Your techs will not stop for expense software. Fieldcard enforces six rules on every request — pick one to
-            see it decide.
+            Six rules on every request. Pick one.
           </SectionIntro>
 
           <div className="lx-ctl-tabs" role="tablist" aria-label="Spending controls" aria-orientation="vertical">
@@ -127,7 +126,7 @@ export function SpendingControls() {
 
             <Receipt example={example} />
           </div>
-          <p className="lx-ctl-foot">Illustrative sandbox example · evaluated by the demo's policy engine · no real transaction</p>
+          <p className="lx-ctl-foot">Sandbox example · no real transaction</p>
         </div>
       </div>
     </section>
