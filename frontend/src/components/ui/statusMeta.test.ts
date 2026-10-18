@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { initialSnapshot } from '../../data/mockData'
-import { activityKind, budgetRisk, byNewest, txnLabel, txnTone } from './statusMeta'
+import { activityKind, budgetRisk, byNewest, ruleState, ruleSummary, txnLabel, txnTone } from './statusMeta'
 
 const { activities, transactions, jobs } = initialSnapshot
 
@@ -41,5 +41,14 @@ describe('status presentation helpers', () => {
     expect(budgetRisk(hen)).toMatchObject({ used: 67, label: 'On track' })
     expect(budgetRisk(ort)).toMatchObject({ used: 99, label: 'At limit' })
     expect(budgetRisk({ ...hen, spentCents: 196_000 }).label).toBe('Watch')
+  })
+})
+
+describe('policy rule language', () => {
+  it('treats the approval threshold as owner review, not failure', () => {
+    const pol5 = initialSnapshot.policyDecisions.find((p) => p.id === 'pol-5')!
+    expect(pol5.rules.map(ruleState)).toEqual(['approval', 'passed'])
+    expect(ruleSummary(pol5.rules)).toBe('1 passed · 1 requires owner approval')
+    expect(ruleSummary([{ ruleId: 'r-mcc', passed: false }, { ruleId: 'r-budget', passed: true }])).toBe('1 passed · 1 failed')
   })
 })

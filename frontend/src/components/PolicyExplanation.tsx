@@ -2,14 +2,13 @@ import { Bot, Check, Clock3, Cpu, Stamp, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { formatDateTime } from '../lib/format'
 import type { PolicyDecision } from '../types'
-import { TONE_CLASSES, type Tone } from './ui/statusMeta'
+import { RULE_STATE_LABEL, ruleState, ruleSummary, TONE_CLASSES, type Tone } from './ui/statusMeta'
 
 /**
  * Decision breakdown in three separate layers: what the AI understood, what
  * the deterministic rules decided, and the final authorization.
  */
 export function PolicyExplanation({ decision, pending = false }: { decision: PolicyDecision; pending?: boolean }) {
-  const passed = decision.rules.filter((r) => r.passed).length
   const tone: Tone = decision.approved ? 'approved' : pending ? 'review' : 'declined'
   const verdict = decision.approved ? 'Authorized' : pending ? 'Awaiting owner approval' : 'Not authorized'
   const VerdictIcon = decision.approved ? Check : pending ? Clock3 : X
@@ -29,24 +28,30 @@ export function PolicyExplanation({ decision, pending = false }: { decision: Pol
         note="Rule engine only — the same inputs always give the same outcome. No model scores."
         aside={
           <span className="fc-num rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-            {passed} / {decision.rules.length} passed
+            {ruleSummary(decision.rules)}
           </span>
         }
       >
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">
           {decision.rules.map((rule) => {
-            const ruleTone: Tone = rule.passed ? 'approved' : rule.ruleId === 'r-approval' ? 'review' : 'declined'
+            const state = ruleState(rule)
+            const ruleTone: Tone = state === 'passed' ? 'approved' : state === 'approval' ? 'review' : 'declined'
             return (
               <li key={rule.ruleId} className="flex gap-3 px-4 py-3">
                 <span
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ring-1 ring-inset ${TONE_CLASSES[ruleTone]}`}
-                  aria-label={rule.passed ? 'Passed' : 'Not passed'}
+                  aria-hidden
                 >
-                  {rule.passed ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
+                  {state === 'passed' ? <Check className="h-3 w-3" strokeWidth={3} /> : state === 'approval' ? <Clock3 className="h-3 w-3" strokeWidth={2.5} /> : <X className="h-3 w-3" strokeWidth={3} />}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <p className="text-sm font-medium text-slate-900">{rule.title}</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {rule.title}{' '}
+                      <span className={`ml-1 text-[11px] font-medium ${state === 'passed' ? 'text-emerald-700' : state === 'approval' ? 'text-amber-700' : 'text-rose-700'}`}>
+                        {RULE_STATE_LABEL[state]}
+                      </span>
+                    </p>
                     {rule.detail && <p className="fc-num text-xs text-slate-600">{rule.detail}</p>}
                   </div>
                   <p className="text-[13px] text-slate-500">{rule.description}</p>

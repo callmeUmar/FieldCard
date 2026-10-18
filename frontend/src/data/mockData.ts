@@ -130,7 +130,8 @@ export const initialSnapshot: DashboardSnapshot = {
       workerId: 'w_mike',
       merchant: 'Ferguson Plumbing Supply',
       mcc: '5074',
-      amountCents: 42_890,
+      // Within Mike's $300 limit and the $250 auto-approve threshold, as its auto-approval requires
+      amountCents: 22_890,
       status: 'approved',
       cardLastFour: '4821',
       createdAt: hoursAgo(2),
@@ -210,7 +211,7 @@ export const initialSnapshot: DashboardSnapshot = {
       id: 'act-1',
       type: 'purchase',
       title: 'Purchase approved',
-      description: 'Ferguson Plumbing Supply — $428.90 on Henderson kitchen remodel',
+      description: 'Ferguson Plumbing Supply — $228.90 on Henderson kitchen remodel',
       timestamp: hoursAgo(2),
       jobId: 'job_henderson',
       transactionId: 'txn-1',
@@ -280,7 +281,7 @@ export const initialSnapshot: DashboardSnapshot = {
           title: 'Materials budget',
           description: 'Spend must not exceed remaining job materials budget',
           passed: true,
-          detail: '$197.10 remaining after purchase (at time of txn)',
+          detail: '$790.00 remaining after purchase',
         },
         {
           ruleId: 'r-mcc',

@@ -83,3 +83,30 @@ export function byNewest<T extends { createdAt?: string; timestamp?: string }>(i
   const t = (x: T) => x.createdAt ?? x.timestamp ?? ''
   return [...items].sort((a, b) => t(b).localeCompare(t(a)))
 }
+
+export type RuleState = 'passed' | 'approval' | 'failed'
+
+/** The approval-threshold rule routes to the owner; it is never a hard failure */
+export function ruleState(rule: { ruleId: string; passed: boolean }): RuleState {
+  if (rule.passed) return 'passed'
+  return rule.ruleId === 'r-approval' ? 'approval' : 'failed'
+}
+
+export const RULE_STATE_LABEL: Record<RuleState, string> = {
+  passed: 'Passed',
+  approval: 'Requires owner approval',
+  failed: 'Failed',
+}
+
+/** e.g. "1 passed · 1 requires owner approval" or "6 passed · 1 failed" */
+export function ruleSummary(rules: { ruleId: string; passed: boolean }[]): string {
+  const n = { passed: 0, approval: 0, failed: 0 }
+  rules.forEach((r) => n[ruleState(r)]++)
+  return [
+    `${n.passed} passed`,
+    n.approval ? `${n.approval} requires owner approval` : '',
+    n.failed ? `${n.failed} failed` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}

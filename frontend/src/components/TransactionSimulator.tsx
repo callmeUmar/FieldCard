@@ -6,7 +6,7 @@ import type { Job, SimulatePurchaseResult } from '../types'
 import { useDashboard } from '../context/DashboardContext'
 import { Button } from './ui/Button'
 import { Card, CardHeader } from './ui/Card'
-import { TONE_CLASSES, txnLabel, txnTone } from './ui/statusMeta'
+import { RULE_STATE_LABEL, ruleState, TONE_CLASSES, txnLabel, txnTone } from './ui/statusMeta'
 
 const ferguson = MERCHANTS.find((m) => m._id === 'merchant_ferguson')!
 const homeDepot = MERCHANTS.find((m) => m._id === 'merchant_home_depot')!
@@ -238,9 +238,15 @@ export function TransactionSimulator({ jobs }: { jobs: Job[] }) {
                           className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
                             r.passed ? 'bg-emerald-400/15 text-emerald-300' : r.ruleId === 'r-approval' ? 'bg-amber-400/15 text-amber-300' : 'bg-rose-400/15 text-rose-300'
                           }`}
-                          aria-label={r.passed ? 'Passed' : 'Not passed'}
+                          aria-label={RULE_STATE_LABEL[ruleState(r)]}
                         >
-                          {r.passed ? <Check className="h-2.5 w-2.5" strokeWidth={3.5} /> : <X className="h-2.5 w-2.5" strokeWidth={3.5} />}
+                          {r.passed ? (
+                            <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
+                          ) : ruleState(r) === 'approval' ? (
+                            <Clock3 className="h-2.5 w-2.5" strokeWidth={3} />
+                          ) : (
+                            <X className="h-2.5 w-2.5" strokeWidth={3.5} />
+                          )}
                         </span>
                         <span className="min-w-0">
                           <span className="text-white/90">{r.title}</span>

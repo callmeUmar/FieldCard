@@ -1,6 +1,11 @@
 import { ArrowUpRight, Briefcase, CreditCard, MapPin } from 'lucide-react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BudgetMeter } from '../components/BudgetProgress'
+import { TransactionInspector } from '../components/TransactionInspector'
+import { TransactionRow } from '../components/TransactionRow'
+import { Card, CardHeader } from '../components/ui/Card'
+import { byNewest } from '../components/ui/statusMeta'
 import { Badge } from '../components/ui/Badge'
 import { PageHeader } from '../components/ui/PageHeader'
 import { PageLoading } from '../components/ui/PageLoading'
@@ -13,8 +18,12 @@ const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | '
   completed: { label: 'Completed', variant: 'default' },
 }
 
+const RECENT_LIMIT = 6
+
 export function JobsPage() {
   const { data, loading } = useDashboard()
+  const [selected, setSelected] = useState<string | null>(null)
+  const close = useCallback(() => setSelected(null), [])
   if (loading || !data) return <PageLoading label="Loading jobs…" />
 
   const { jobs, workers, cards, transactions } = data
@@ -90,6 +99,34 @@ export function JobsPage() {
           })}
         </ul>
       )}
+
+      {transactions.length > 0 && (
+        <Card className="fc-enter fc-enter-3 overflow-hidden">
+          <CardHeader
+            title="Recent purchases"
+            description={`Newest across all jobs · showing ${Math.min(RECENT_LIMIT, transactions.length)} of ${transactions.length} · select one to inspect`}
+            action={
+              <Link to="/activity" className="whitespace-nowrap text-[13px] font-medium text-indigo-600 hover:text-indigo-500">
+                Full timeline
+              </Link>
+            }
+          />
+          {byNewest(transactions)
+            .slice(0, RECENT_LIMIT)
+            .map((txn) => (
+              <TransactionRow
+                key={txn.id}
+                txn={txn}
+                job={jobs.find((j) => j.id === txn.jobId)}
+                worker={workers.find((w) => w.id === txn.workerId)}
+                onSelect={(t) => setSelected(t.id)}
+                selected={selected === txn.id}
+              />
+            ))}
+        </Card>
+      )}
+
+      <TransactionInspector txnId={selected} onClose={close} />
     </div>
   )
 }

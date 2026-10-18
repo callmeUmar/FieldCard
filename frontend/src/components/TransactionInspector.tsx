@@ -1,11 +1,11 @@
-import { ArrowRight, Briefcase, Check, CreditCard, ExternalLink, Store, UserRound, X } from 'lucide-react'
+import { ArrowRight, Briefcase, Check, Clock3, CreditCard, ExternalLink, Store, UserRound, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useDashboard } from '../context/DashboardContext'
 import { formatCurrencyPrecise, formatDateTime, jobRemainingCents } from '../lib/format'
 import { BudgetMeter } from './BudgetProgress'
 import { StatusPill } from './ui/StatusPill'
-import { txnTone } from './ui/statusMeta'
+import { RULE_STATE_LABEL, ruleState, ruleSummary, txnTone } from './ui/statusMeta'
 
 const usd = formatCurrencyPrecise
 
@@ -90,28 +90,38 @@ export function TransactionInspector({ txnId, onClose }: { txnId: string | null;
             <section aria-label="Policy decision">
               <div className="flex items-center justify-between">
                 <p className="fc-kicker text-slate-400">Authorization</p>
-                <p className="fc-num text-xs text-slate-500">
-                  {decision.rules.filter((r) => r.passed).length} of {decision.rules.length} checks passed
-                </p>
+                <p className="fc-num text-right text-xs text-slate-500">{ruleSummary(decision.rules)}</p>
               </div>
               <p className="mt-2 text-sm font-medium text-slate-900">{decision.summary}</p>
               <ul className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-100">
-                {decision.rules.map((rule) => (
-                  <li key={rule.ruleId} className="flex gap-3 px-3.5 py-2.5">
-                    <span
-                      className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full ${
-                        rule.passed ? 'bg-emerald-50 text-emerald-600' : rule.ruleId === 'r-approval' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
-                      }`}
-                      aria-label={rule.passed ? 'Passed' : 'Not passed'}
-                    >
-                      {rule.passed ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[13px] font-medium text-slate-800">{rule.title}</span>
-                      {rule.detail && <span className="block text-xs text-slate-500">{rule.detail}</span>}
-                    </span>
-                  </li>
-                ))}
+                {decision.rules.map((rule) => {
+                  const state = ruleState(rule)
+                  return (
+                    <li key={rule.ruleId} className={`flex gap-3 px-3.5 py-2.5 ${state === 'approval' ? 'bg-amber-50/50' : ''}`}>
+                      <span
+                        className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full ${
+                          state === 'passed' ? 'bg-emerald-50 text-emerald-600' : state === 'approval' ? 'bg-amber-100 text-amber-700' : 'bg-rose-50 text-rose-600'
+                        }`}
+                        aria-hidden
+                      >
+                        {state === 'passed' ? <Check className="h-3 w-3" strokeWidth={3} /> : state === 'approval' ? <Clock3 className="h-3 w-3" strokeWidth={2.5} /> : <X className="h-3 w-3" strokeWidth={3} />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-baseline justify-between gap-x-2">
+                          <span className="text-[13px] font-medium text-slate-800">{rule.title}</span>
+                          <span
+                            className={`text-[11px] font-medium ${
+                              state === 'passed' ? 'text-emerald-700' : state === 'approval' ? 'text-amber-700' : 'text-rose-700'
+                            }`}
+                          >
+                            {RULE_STATE_LABEL[state]}
+                          </span>
+                        </span>
+                        {rule.detail && <span className="block text-xs text-slate-500">{rule.detail}</span>}
+                      </span>
+                    </li>
+                  )
+                })}
               </ul>
               <Link
                 to={`/policy/${decision.id}`}
