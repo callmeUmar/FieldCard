@@ -770,6 +770,8 @@ async def ai_audit(request: Request):
         payload = await request.json()
     except Exception:
         payload = {}
+    if not isinstance(payload, dict):  # e.g. a bare JSON string: treat it as the prompt
+        payload = {"prompt": str(payload)}
     return await run_in_threadpool(_audit, payload)
 
 
