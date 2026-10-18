@@ -9,12 +9,14 @@ import { ActivityPage } from './pages/ActivityPage'
 import { SimulatorPage } from './pages/SimulatorPage'
 import { PolicyPage } from './pages/PolicyPage'
 import { LiveAgentDemoPage } from './pages/LiveAgentDemoPage'
+import { LandingPage } from './pages/LandingPage'
 
 export default function App() {
   return (
     <DashboardProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/landing" element={<LandingPage />} />
           <Route element={<AppShell />}>
             <Route index element={<OverviewPage />} />
             <Route path="live-demo" element={<LiveAgentDemoPage />} />

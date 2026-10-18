@@ -1,0 +1,506 @@
+/*
+ * "Scroll to control" — sticky scroll story on the landing page.
+ *
+ * ScrollToControlSection writes eased 0→1 progress values onto .story:
+ *   --enter   phone enters and comes into focus
+ *   --focus   camera shifts from the phone to the sandbox card
+ *   --c1..c3  the three card constraints appear
+ *   --decide  the transaction decision resolves
+ *   --p       overall progress
+ * Everything below is transform/opacity driven by those values. All layers
+ * stay mounted, so layout never changes between phases.
+ */
+
+.story {
+  --p: 0;
+  --enter: 0;
+  --focus: 0;
+  --c1: 0;
+  --c2: 0;
+  --c3: 0;
+  --decide: 0;
+
+  /* Scene geometry (desktop: phone column + card column side by side) */
+  --phone-w: clamp(220px, calc((100vh - 170px) * 0.4613), 272px);
+  --stack-w: 300px;
+  --scene-gap: 48px;
+  /* Before the camera shift the phone sits centred in the scene, and the card
+     starts on top of the in-thread card inside the (still offset) phone. */
+  --phone-from-x: calc((var(--stack-w) + var(--scene-gap)) / 2);
+  --card-from-x: calc(
+    var(--phone-from-x) - (var(--phone-w) / 2 + var(--scene-gap) + var(--stack-w) / 2)
+  );
+  --card-from-y: 260px;
+  --phone-turn: 14deg;
+  --phone-recede: 0.06;
+  --phone-dim: 0.12;
+
+  position: relative;
+  height: 520vh;
+  background: #03060d;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: #e8ecf4;
+}
+
+@supports (height: 100svh) {
+  .story {
+    --phone-w: clamp(220px, calc((100svh - 170px) * 0.4613), 272px);
+  }
+}
+
+.story-stage {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 0%, rgba(79, 70, 229, 0.09), transparent 70%),
+    linear-gradient(to bottom, rgba(6, 10, 20, 1), rgba(3, 6, 13, 0) 18%);
+}
+
+.story-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 40px;
+  width: 100%;
+}
+
+/* ---------- Copy ---------- */
+
+.story-chapters {
+  display: grid;
+}
+
+.story-chapter {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  pointer-events: none;
+  transition:
+    opacity 0.4s ease,
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.story-chapter[data-state='past'] {
+  transform: translate3d(0, -16px, 0);
+}
+
+.story-chapter[data-state='active'] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition-delay: 0.1s;
+}
+
+.story-rail {
+  display: flex;
+  gap: 6px;
+  max-width: 460px;
+  margin: 44px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.story-rail li {
+  flex: 1 1 auto;
+}
+
+.story-rail span {
+  display: block;
+  padding-top: 10px;
+  border-top: 2px solid rgba(255, 255, 255, 0.1);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.3);
+  transition:
+    color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.story-rail li[data-done] span {
+  border-color: rgba(165, 180, 252, 0.75);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.story-progress {
+  display: none;
+}
+
+/* ---------- Scene ---------- */
+
+.story-scene {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--phone-w) var(--stack-w);
+  column-gap: var(--scene-gap);
+  align-items: center;
+  perspective: 1600px;
+}
+
+/* Soft key light that follows the camera from the phone to the card */
+.story-light {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 640px;
+  height: 640px;
+  margin: -320px 0 0 -320px;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgba(99, 102, 241, 0.13), transparent);
+  pointer-events: none;
+  opacity: var(--enter);
+  transform: translate3d(calc((1 - var(--focus)) * var(--phone-from-x)), 0, 0);
+}
+
+.story-phone {
+  position: relative;
+  z-index: 1;
+  width: var(--phone-w);
+  transform-origin: 50% 60%;
+  transform:
+    translate3d(
+      calc((1 - var(--focus)) * var(--phone-from-x)),
+      calc((1 - var(--enter)) * 110px),
+      0
+    )
+    rotateX(calc(4deg + (1 - var(--enter)) * 18deg))
+    rotateY(calc(-14deg + var(--enter) * 8deg + var(--focus) * var(--phone-turn)))
+    scale(calc(0.86 + var(--enter) * 0.14 - var(--focus) * var(--phone-recede)));
+  opacity: calc(var(--enter) * (1 - var(--focus) * var(--phone-dim)));
+  will-change: transform, opacity;
+}
+
+/* The scene owns the phone's 3D pose; neutralise the frame's static tilt. */
+.story-phone .phone-perspective {
+  perspective: none;
+}
+.story-phone .phone-device {
+  transform: none;
+}
+.story-phone .phone-messages-scroll {
+  max-height: none;
+}
+
+.story-stack {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: var(--stack-w);
+}
+
+.story-card {
+  position: relative;
+  aspect-ratio: 1.586;
+  overflow: hidden;
+  padding: 18px 20px;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #1e1b4b 100%);
+  box-shadow:
+    0 40px 70px -30px rgba(0, 0, 0, 0.85),
+    0 18px 40px -24px rgba(79, 70, 229, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  transform:
+    translate3d(
+      calc((1 - var(--focus)) * var(--card-from-x)),
+      calc((1 - var(--focus)) * var(--card-from-y)),
+      0
+    )
+    /* Starts in the phone's pose, tilts up mid-flight, lands flat */
+    rotateX(calc((1 - var(--focus)) * 4deg + var(--focus) * (1 - var(--focus)) * 36deg))
+    rotateY(calc((1 - var(--focus)) * -6deg))
+    scale(calc(0.74 + var(--focus) * 0.26 + var(--focus) * (1 - var(--focus)) * 0.14));
+  opacity: calc(var(--focus) * 4);
+  will-change: transform, opacity;
+}
+
+.story-card-chip {
+  width: 34px;
+  height: 25px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #e3d4a3 0%, #a8915a 55%, #d8c690 100%);
+  opacity: 0.85;
+}
+
+.story-constraints {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.story-constraint {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  /* Opaque so the phone never shows through when layered (mobile) */
+  background: #0b1122;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  opacity: var(--reveal);
+  transform: translate3d(0, calc((1 - var(--reveal)) * -12px), 0);
+}
+
+/* Each constraint is checked off as the decision resolves */
+.story-constraint::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: inherit;
+  opacity: var(--decide);
+  pointer-events: none;
+}
+
+.story-check {
+  opacity: var(--decide);
+  transform: scale(calc(0.6 + var(--decide) * 0.4));
+}
+
+.story-decision {
+  margin-top: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #0b1122;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 48px -28px rgba(0, 0, 0, 0.8);
+  opacity: var(--decide);
+  transform: translate3d(0, calc((1 - var(--decide)) * 16px), 0);
+}
+
+.story-verdict {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  font-size: 12px;
+  font-weight: 600;
+  /* Lands in the second half of the decision beat */
+  opacity: calc(var(--decide) * 2 - 1);
+  transform: scale(calc(0.9 + var(--decide) * 0.1));
+}
+
+/* ---------- Tablet & mobile: copy on top, card comes forward over the phone ---------- */
+
+@media (max-width: 1023.98px) {
+  .story {
+    --phone-w: clamp(180px, min(calc((100vh - 270px) * 0.4613), calc(100vw - 96px)), 250px);
+    --stack-w: min(300px, calc(100vw - 40px));
+    --phone-from-x: 0px;
+    --card-from-x: 0px;
+    --card-from-y: 110px;
+    --phone-turn: 0deg;
+    --phone-recede: 0.1;
+    --phone-dim: 0.82;
+    height: 480vh;
+  }
+
+  @supports (height: 100svh) {
+    .story {
+      --phone-w: clamp(180px, min(calc((100svh - 270px) * 0.4613), calc(100vw - 96px)), 250px);
+    }
+  }
+
+  .story-stage {
+    align-items: stretch;
+  }
+
+  .story-inner {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+    height: 100%;
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+
+  .story-scene {
+    grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+  }
+
+  .story-phone,
+  .story-stack {
+    grid-area: 1 / 1;
+  }
+
+  .story-rail {
+    display: none;
+  }
+
+  .story-progress {
+    position: absolute;
+    inset: auto 0 0;
+    display: block;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .story-progress span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #a5b4fc);
+    transform: scaleX(var(--p));
+    transform-origin: left;
+  }
+
+  .story-light {
+    transform: none;
+  }
+}
+
+/* Tablet portrait: copy on top, but enough width for the side-by-side scene */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .story {
+    --stack-w: 300px;
+    --scene-gap: 40px;
+    --phone-from-x: calc((var(--stack-w) + var(--scene-gap)) / 2);
+    --card-from-x: calc(
+      var(--phone-from-x) - (var(--phone-w) / 2 + var(--scene-gap) + var(--stack-w) / 2)
+    );
+    --card-from-y: 220px;
+    --phone-turn: 14deg;
+    --phone-recede: 0.06;
+    --phone-dim: 0.12;
+  }
+
+  .story-scene {
+    grid-template-columns: var(--phone-w) var(--stack-w);
+    place-content: center;
+  }
+
+  .story-phone,
+  .story-stack {
+    grid-area: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .story-constraint {
+    height: 40px;
+  }
+
+  .story-card {
+    padding: 16px 18px;
+  }
+}
+
+/* Short phones (e.g. 375×667): scale the stack as a unit (no text reflow) and
+   tighten spacing so the copy, CTA and scene never overlap */
+@media (max-width: 1023.98px) and (max-height: 760px) {
+  .story-inner {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .story-stack {
+    gap: 8px;
+    transform: scale(0.86);
+  }
+
+  .story-constraints {
+    gap: 6px;
+    margin-top: 0;
+  }
+
+  .story-constraint {
+    height: 36px;
+  }
+
+  .story-decision {
+    margin-top: 0;
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 1023.98px) and (max-height: 640px) {
+  .story-stack {
+    transform: scale(0.76);
+  }
+}
+
+/* ---------- Reduced motion: a static, fully resolved composition ---------- */
+
+.story[data-static] {
+  --p: 1 !important;
+  --enter: 1 !important;
+  --focus: 1 !important;
+  --c1: 1 !important;
+  --c2: 1 !important;
+  --c3: 1 !important;
+  --decide: 1 !important;
+  height: auto;
+}
+
+.story[data-static] .story-stage {
+  position: relative;
+  height: auto;
+  overflow: visible;
+  padding: 96px 0;
+}
+
+.story[data-static] .story-inner {
+  align-items: start;
+  height: auto;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.story[data-static] .story-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.story[data-static] .story-chapter {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition: none;
+}
+
+.story[data-static] .story-phone,
+.story[data-static] .story-stack,
+.story[data-static] .story-card {
+  transform: none;
+  opacity: 1;
+}
+
+.story[data-static] .story-rail,
+.story[data-static] .story-progress,
+.story[data-static] .story-light {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  .story[data-static] .story-inner {
+    gap: 48px;
+  }
+
+  .story[data-static] .story-scene {
+    row-gap: 32px;
+  }
+
+  .story[data-static] .story-phone,
+  .story[data-static] .story-stack {
+    grid-area: auto;
+  }
+}
