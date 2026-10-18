@@ -9,15 +9,13 @@ import requests
 from fastapi import APIRouter, BackgroundTasks, Request, Response, status
 from pymongo.errors import DuplicateKeyError
 
-try:  # standard import setup matching agent.py
+try:
     from db import mongo, now
 except ImportError:
     from backend.db import mongo, now
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
-# main.py registers the function that routes an inbound text to the owner flow
-# or the Gemini agent (route_message) and texts back the reply.
 _inbound_handler: Callable[[dict], None] | None = None
 
 
@@ -31,15 +29,6 @@ def _first(*values):
 
 
 def parse_inbound(payload: dict) -> dict | None:
-    """Normalizes a Photon webhook payload to {id, from_phone, text, image_url}.
-
-    Accepts both shapes we may receive:
-      - flat: {"from"|"sender": "+1555...", "text"|"body": "...", "media"|"mediaUrl": ...}
-      - Spectrum message: {"id", "direction", "content": {"type": "text", "text"}, "sender": {...}},
-        optionally wrapped in {"message": {...}} or {"data": {...}}
-    Returns None for anything that isn't an inbound message (outbound echoes,
-    typing, read receipts, reactions) or has no sender.
-    """
     if not isinstance(payload, dict):
         return None
     msg = (
@@ -55,7 +44,7 @@ def parse_inbound(payload: dict) -> dict | None:
     content = msg.get("content") if isinstance(msg.get("content"), dict) else {}
     kind = content.get("type")
     if kind and kind not in ("text", "markdown", "attachment", "reply"):
-        return None  # typing, read, reaction, edit, ...
+        return None
     if kind == "reply" and isinstance(content.get("content"), dict):
         content = content["content"]
         kind = content.get("type")
@@ -92,8 +81,6 @@ def parse_inbound(payload: dict) -> dict | None:
 
 
 def _token_ok(request: Request) -> bool:
-    """If PHOTON_WEBHOOK_TOKEN is set, the webhook URL must carry ?token=<it>,
-    so nobody else can post fake texts (e.g. an owner "YES")."""
     expected = os.getenv("PHOTON_WEBHOOK_TOKEN")
     if not expected:
         return True
@@ -102,7 +89,6 @@ def _token_ok(request: Request) -> bool:
 
 
 def _log(doc: dict) -> bool:
-    """Logs the delivery; returns False if this message id was already handled (retry)."""
     try:
         mongo.messaging_logs.insert_one(doc)
         return True
@@ -113,7 +99,6 @@ def _log(doc: dict) -> bool:
         return True
 
 
-# Fallback store for local testing
 DEV_OUTBOX = []
 
 _suppressed = contextvars.ContextVar("sms_suppressed", default=False)
@@ -121,7 +106,6 @@ _suppressed = contextvars.ContextVar("sms_suppressed", default=False)
 
 @contextmanager
 def suppressed():
-    """No SMS leaves the server inside this block (used by the /ai/audit sandbox)."""
     token = _suppressed.set(True)
     try:
         yield
@@ -130,7 +114,6 @@ def suppressed():
 
 
 def photon_send(to_phone: str, text: str) -> None:
-    """Sends outbound SMS using Photon API."""
     api_key = os.environ.get("PHOTON_API_KEY")
     project_id = os.environ.get("PHOTON_PROJECT_ID", "")
 
@@ -156,13 +139,11 @@ def photon_send(to_phone: str, text: str) -> None:
 
 
 def send_text(to_phone: str, text: str) -> None:
-    """Routes text via Photon or logs to dev outbox."""
     if _suppressed.get():
         print(f"[SMS suppressed (sandbox) -> {len(text)} chars]")
         return
     DEV_OUTBOX.append({"to": to_phone, "text": text})
 
-    # Check if MESSAGING environment variable is explicitly set to dev
     if os.environ.get("MESSAGING") == "dev":
         print(f"[DEV OUTBOX -> {to_phone}]: {text}")
         return
@@ -176,11 +157,6 @@ def send_text(to_phone: str, text: str) -> None:
 @router.api_route("/photon", methods=["GET", "POST"])
 @router.api_route("/webhooks/photon", methods=["GET", "POST"])
 async def photon_webhook(request: Request, background: BackgroundTasks):
-    """
-    Photon webhook endpoint.
-    - GET: URL validation handshake.
-    - POST: Receives inbound texts, processes in the background, and logs.
-    """
     if request.method == "GET":
         return Response(
             content='{"status": "ok", "message": "Photon webhook endpoint active"}',
@@ -195,4 +171,20 @@ async def photon_webhook(request: Request, background: BackgroundTasks):
         payload = json.loads(raw or b"{}")
     except ValueError:
         payload = {"raw_body": raw.decode("utf-8", errors="ignore")}
-    print(f"[WEBHOOK RECEIVED]:
+    print(f"[WEBHOOK RECEIVED]: {payload}")
+
+    msg = parse_inbound(payload)
+    log = {"source": "photon", "payload": payload, "received_at": now(), "parsed": msg}
+    if msg and msg["id"]:
+        log["_id"] = f"photon_{msg['id']}"
+    if not _log(log):
+        return {"status": "duplicate"}
+    if msg is None:
+        return {"status": "ignored"}
+    if _inbound_handler is None:
+        print("[photon] no inbound handler registered; message logged only")
+        return {"status": "logged"}
+
+    print(f"[photon] inbound from {msg['from_phone'][-4:]}: {len(msg['text'])} chars, image={bool(msg['image_url'])}")
+    background.add_task(_inbound_handler, msg)
+    return {"status": "accepted"}
