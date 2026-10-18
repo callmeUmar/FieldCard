@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pymongo
+psycopg[binary]
+google-genai
+requests
+python-dotenv
+pytest
