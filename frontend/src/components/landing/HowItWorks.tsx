@@ -16,35 +16,35 @@ const STEPS: Step[] = [
   {
     kicker: 'SMS request',
     title: `${H.worker} texts what he needs.`,
-    body: 'No app to open. A plain text from the counter names the job, the store and the amount.',
+    body: 'Job, store and amount, in one text.',
     icon: MessageSquareText,
     artifact: () => <SmsArtifact />,
   },
   {
     kicker: 'AI interpretation',
-    title: 'The message becomes a structured request.',
-    body: 'Job code, worker, merchant, category and amount are pulled out, so rules run on facts — not free text.',
+    title: 'The text becomes a request.',
+    body: 'Job, store and amount, read as facts.',
     icon: ScanText,
     artifact: () => <ParsedArtifact />,
   },
   {
     kicker: 'Policy evaluation',
-    title: 'Your rules run before money moves.',
-    body: 'Job status, worker limit, remaining budget, merchant category and approval threshold — each checked in turn.',
+    title: 'Your rules run first.',
+    body: 'Budget, limit, store type and threshold.',
     icon: ShieldCheck,
     artifact: () => <PolicyArtifact />,
   },
   {
     kicker: 'Sandbox card',
-    title: 'A card is issued for exactly this purchase.',
-    body: `Capped at ${H.card.cap}, locked to MCC ${H.card.mccs}, single-use, and closed after ${H.card.hours} hours.`,
+    title: 'A card for this purchase only.',
+    body: `${H.card.cap} cap, one store type, ${H.card.hours} hours.`,
     icon: CreditCard,
     artifact: () => <CardArtifact />,
   },
   {
     kicker: 'Result',
-    title: 'The authorization posts to the job.',
-    body: `Approved at the counter and coded to ${H.result.jobCode} — ${H.result.remaining} left on the materials budget.`,
+    title: 'It posts to the job.',
+    body: `Coded to ${H.result.jobCode}, ${H.result.remaining} left.`,
     icon: BadgeCheck,
     artifact: () => <ResultArtifact />,
   },
@@ -81,7 +81,7 @@ export function HowItWorks() {
     <section id="how-it-works" className="lx-section lx-hiw" aria-labelledby="hiw-heading">
       <div className="lx-container">
         <SectionIntro id="hiw-heading" kicker="How it works" title="From a text to a coded purchase.">
-          Five steps, a few seconds, no new app for your crew.
+          Five steps, a few seconds.
         </SectionIntro>
 
         <div className="lx-hiw-grid">

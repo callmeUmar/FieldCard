@@ -446,6 +446,48 @@ def api_activity(limit: int = 50, job_id: str | None = None, since: str | None =
     return _activity_of(job_ids, limit, job_id, since)
 
 
+@app.get("/api/overview")
+def api_overview(company_id: str | None = None):
+    """Headline numbers and the latest card, for the dashboard overview and the
+    landing page. "Today" starts at midnight UTC."""
+    company, _, worker_ids = _scope(company_id)
+    jobs = list(mongo.jobs.find({"company_id": company["_id"]}))
+    job_ids = [j["_id"] for j in jobs]
+    start = now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = list(mongo.transactions.find({"job_id": {"$in": job_ids}, "occurred_at": {"$gte": start}}))
+    # Cards don't store an issue time; every card lasts agent.CARD_HOURS, so one
+    # issued today expires at least CARD_HOURS after midnight.
+    issued_today = mongo.cards.count_documents(
+        {"worker_id": {"$in": worker_ids}, "expires_at": {"$gte": start + timedelta(hours=agent.CARD_HOURS)}}
+    )
+    latest = mongo.cards.find_one({"worker_id": {"$in": worker_ids}}, sort=[("expires_at", -1)])
+    latest_card = None
+    if latest:
+        req = mongo.requests.find_one({"_id": latest.get("request_id")}) or {}
+        job = next((j for j in jobs if j["_id"] == req.get("job_id")), None)
+        latest_card = {
+            "_id": latest["_id"],
+            "last4": latest.get("last4"),
+            "merchant": req.get("merchant"),
+            "job_id": req.get("job_id"),
+            "job_name": job.get("name") if job else None,
+            "job_code": job.get("code") if job else None,
+            "amount_cap_usd": latest.get("amount_cap_usd"),
+            "expires_at": latest.get("expires_at"),
+            "state": latest.get("state"),
+            "hours_left": round(max((latest["expires_at"] - now()).total_seconds(), 0) / 3600, 1)
+            if latest.get("expires_at") else 0,
+        }
+    return {
+        "spent_usd": round(sum(j.get("spent_usd", 0) for j in jobs), 2),
+        "budget_usd": round(sum(j.get("materials_budget_usd", 0) for j in jobs), 2),
+        "cards_issued_today": issued_today,
+        "blocked_today": sum(1 for t in today if t.get("result") == "declined"),
+        "tracked_today_usd": round(sum(t.get("amount_usd", 0) for t in today if t.get("result") == "approved"), 2),
+        "latest_card": latest_card,
+    }
+
+
 @app.get("/api/dashboard")
 def api_dashboard(company_id: str | None = None):
     """Everything the dashboard shows, in one read (so a refresh is one request)."""

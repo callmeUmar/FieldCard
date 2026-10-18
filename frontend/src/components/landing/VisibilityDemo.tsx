@@ -24,11 +24,11 @@ const STAGES = [
 
 /** Phase 0 is the "before" state; phase n means stage n has happened */
 const CAPTIONS = [
-  `Before: ${V.job.code} has ${usd(V.before.spentCents)} spent of ${usd(V.budgetCents)}.`,
-  `${V.job.worker} pays ${V.purchase.merchant} ${usd(V.purchase.amountCents)} with sandbox card •••• ${V.purchase.cardLastFour}.`,
-  `Approved in sandbox — ${V.purchase.checksPassed} of ${V.purchase.checksTotal} policy checks passed. No receipt to chase.`,
-  `Spent rises to ${usd(V.after.spentCents)}. ${usd(V.after.remainingCents)} left on the materials budget.`,
-  `Logged to the activity feed, already coded to ${V.job.code}.`,
+  `${V.job.code}: ${usd(V.before.spentCents)} of ${usd(V.budgetCents)} spent.`,
+  `${V.job.worker} pays ${V.purchase.merchant} ${usd(V.purchase.amountCents)}.`,
+  `Approved. ${V.purchase.checksPassed} of ${V.purchase.checksTotal} checks passed.`,
+  `Spent ${usd(V.after.spentCents)}. ${usd(V.after.remainingCents)} left.`,
+  `Logged, coded to ${V.job.code}.`,
 ]
 
 const PHASE_AT_MS = [0, 500, 1500, 2600, 3900]
@@ -80,7 +80,7 @@ export function VisibilityDemo() {
     <section id="visibility" className="lx-section lx-vis" aria-labelledby="vis-heading">
       <div className="lx-container">
         <SectionIntro id="vis-heading" kicker="The owner dashboard" title="Complete visibility.">
-          One purchase, followed all the way through. The moment it clears, the job's numbers are already right.
+          Each purchase posts to its job as it clears.
         </SectionIntro>
 
         <div ref={ref} className="lx-vis-wrap" data-phase={phase}>

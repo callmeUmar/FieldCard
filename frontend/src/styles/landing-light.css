@@ -1,0 +1,333 @@
+/*
+ * Light theme for the existing landing sections. Loaded last; changes colors
+ * only. No layout, timing or animation rules are touched. The cinematic film
+ * keeps its own dark stage (.cine).
+ */
+
+.landing-root {
+  --landing-bg: #fff;
+  --lx-ink: #0a2540;
+  --lx-muted: #697386;
+  --lx-faint: #8792a2;
+  --lx-line: #e3e8ee;
+  --lx-surface: #f6f8fa;
+  --lx-accent: #5b5bf0;
+  --lx-ok: #12b5a5;
+  --lx-bad: #df1b41;
+  --lx-warn: #a04100;
+  background-color: #fff;
+  color: #0a2540;
+}
+
+.lx-section,
+.lx-cta {
+  background: #fff;
+}
+
+.landing-glass {
+  background: #fff;
+  border: 1px solid #e3e8ee;
+}
+
+/* Section headings */
+.landing-kicker {
+  color: #5b5bf0;
+}
+.landing-kicker::before {
+  background: #5b5bf0;
+  opacity: 0.5;
+}
+.landing-h2 {
+  color: #0a2540;
+}
+.lx-cta-line-2 > span {
+  color: #697386;
+}
+
+/* Header */
+.lx-nav-link {
+  color: #425466;
+}
+.lx-nav-link:hover {
+  color: #0a2540;
+}
+.lx-nav-pill {
+  border: 1px solid #e3e8ee;
+  background: #fff;
+  color: #0a2540;
+}
+.lx-nav-pill:hover {
+  border-color: #c1c9d2;
+  background: #f6f8fa;
+}
+
+/* Chips */
+.lx-chip {
+  color: #a04100;
+}
+.lx-chip-dark {
+  color: #697386;
+  background: #f6f8fa;
+  box-shadow: inset 0 0 0 1px #e3e8ee;
+}
+
+/* How it works */
+.lx-hiw-node,
+.lx-hiw-inline {
+  background: #fff;
+}
+[data-state='active'] > .lx-hiw-head .lx-hiw-node {
+  color: #fff;
+  background: #5b5bf0;
+}
+[data-state='done'] > .lx-hiw-head .lx-hiw-node {
+  background: #f0f0fe;
+}
+.lx-hiw-title {
+  color: #8792a2;
+}
+.lx-hiw-body {
+  color: #a3acb9;
+}
+[data-state='done'] .lx-hiw-title {
+  color: #425466;
+}
+[data-state='done'] .lx-hiw-body {
+  color: #8792a2;
+}
+
+/* Spending controls */
+.lx-ctl-tab:hover {
+  background: #f6f8fa;
+}
+.lx-ctl-tab[aria-selected='true'] {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #e3e8ee;
+}
+.lx-ctl-tab-icon {
+  background: #f6f8fa;
+}
+.lx-ctl-tab[aria-selected='true'] .lx-ctl-tab-icon {
+  color: #fff;
+  background: #5b5bf0;
+}
+.lx-ctl-panel {
+  background: #fff;
+  border: 1px solid #e3e8ee;
+}
+.lx-seg {
+  background: #f6f8fa;
+}
+.lx-seg-thumb {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #e3e8ee;
+}
+.lx-scale-track {
+  background: #f6f8fa;
+}
+.lx-scale-range {
+  background: #e3e8ee;
+}
+.lx-scale-track > .lx-scale-limit {
+  background: #0a2540;
+}
+.lx-mcc-chip,
+.lx-uses-slots li,
+.lx-receipt {
+  background: #f6f8fa;
+}
+/* Cards stay cards: navy */
+.lx-uses-card {
+  background: #0a2540;
+  box-shadow: none;
+}
+
+/* Complete visibility */
+.lx-vis-node-icon {
+  background: #fff;
+}
+.lx-vis-link[data-on='true'] .lx-vis-node-icon {
+  background: #f0f0fe;
+}
+.lx-vis-link[data-current='true'] .lx-vis-node-icon {
+  color: #fff;
+  background: #5b5bf0;
+}
+.lx-ghost-btn:hover {
+  background: #f6f8fa;
+}
+.lx-board {
+  background: #fff;
+  border: 1px solid #e3e8ee;
+}
+.lx-txn-summary > div {
+  background: #f6f8fa;
+}
+.lx-board-card {
+  background: #fff;
+}
+.lx-txn-new[data-shown='true'] .lx-txn-merchant {
+  color: #0a2540;
+}
+.lx-budget-bar {
+  background: #e3e8ee;
+}
+.lx-feed-dot-old {
+  background: #c1c9d2;
+}
+
+/* Closing call to action: one accent button */
+.lx-btn-primary {
+  color: #fff;
+  background: #5b5bf0;
+  border-radius: 6px;
+}
+.lx-btn-primary:hover {
+  background: #4b4be0;
+}
+.lx-btn-secondary {
+  border: 1px solid #e3e8ee;
+}
+
+/* Policy stack: legend on white, the stacked cards navy */
+.pstack-sub,
+.pstack-legend-summary,
+.pstack-count {
+  color: #697386;
+}
+.pstack-legend-label {
+  color: #0a2540;
+}
+.pstack-legend-item:hover {
+  background: #f6f8fa;
+}
+.pstack-legend-item[aria-pressed='true'] {
+  border-color: #e3e8ee;
+  background: #f6f8fa;
+}
+.pstack-hint {
+  color: #8792a2;
+}
+.pstack-count {
+  border-left: 1px solid #e3e8ee;
+}
+.pstack {
+  --ps-approved: #12b5a5;
+  --ps-declined: #df1b41;
+  --ps-review: #a04100;
+  background: #fff;
+}
+.pstack-ground {
+  display: none;
+}
+.pstack-card {
+  /* lighter tones of the same status colors, legible on navy */
+  --ps-approved: #2fd4c3;
+  --ps-declined: #ff8aa1;
+  --ps-review: #fcedb9;
+  background: #0a2540;
+  box-shadow: none;
+}
+/* Cards further back fade toward the white page */
+.pstack-card-shade {
+  background: #fff;
+}
+
+/* One font stack everywhere: the small uppercase labels use it too */
+.landing-root,
+.landing-root .cine,
+.landing-root .cine-static,
+.landing-root .cine-static-hero {
+  --lx-mono: var(--fc-font);
+  --cine-mono: var(--fc-font);
+}
+.landing-kicker,
+.pstack-sandbox,
+.pstack-job,
+.pstack-hint {
+  font-family: var(--fc-font);
+}
+
+/* No shadows. Panels get a 1px border instead. (Keyframe animations still run:
+   animations take precedence over these declarations.) */
+.lx-hiw-panel,
+.lx-ctl-panel,
+.lx-board,
+.lx-scale-purchase {
+  border: 1px solid #e3e8ee;
+  box-shadow: none;
+}
+[data-state='active'] > .lx-hiw-head .lx-hiw-node,
+.lx-mcc-chip[data-hit='true'],
+.lx-outcome-badge,
+.lx-vis-link[data-current='true'] .lx-vis-node-icon,
+.lx-board-card[data-hot='true'],
+.lx-feed-dot,
+.lx-btn-primary,
+.lx-btn-primary:hover,
+.pstack-legend-icon,
+.pstack-badge {
+  box-shadow: none;
+}
+/* The mini card in "How it works" is a card: navy, flat */
+.lx-mini-card {
+  background: #0a2540;
+  box-shadow: none;
+}
+
+/* How it works: the step panel on white; panels use the 8px radius */
+.lx-hiw-panel,
+.lx-hiw-inline {
+  background: #fff;
+  border: 1px solid #e3e8ee;
+  box-shadow: none;
+}
+.lx-hiw-panel,
+.lx-ctl-panel,
+.lx-board {
+  border-radius: 8px;
+}
+.lx-sms-bubble {
+  color: #0a2540;
+  background: #f6f8fa;
+}
+.lx-avatar {
+  background: #5b5bf0;
+}
+.lx-rule-mark,
+.lx-result-badge {
+  background: #d7f5ef;
+}
+
+/* ---------- No background fades anywhere: flat surfaces only ---------- */
+
+/* White sections: no key-light glows */
+.lx-section::before,
+.lx-cta-light,
+.lx-cta-glow {
+  display: none;
+}
+.lx-ctl,
+.lx-hiw,
+.lx-vis {
+  --lx-light: none;
+}
+
+/* The film: one flat dark backdrop, no radial backdrop, vignette, glow or scrims.
+   (The glow element is still animated by the timeline; it just isn't painted.) */
+.landing-root .cine-backdrop {
+  background: #060709;
+}
+.landing-root .cine-vignette,
+.landing-root .cine-overlay::before,
+.landing-root .cine-static-copy {
+  background: none;
+}
+.landing-root .cine-glow {
+  display: none;
+}
+/* Step connector lines: solid accent */
+.lx-hiw-step:not(:last-child)::after,
+.lx-vis-link:not(:last-child)::after {
+  background: #5b5bf0;
+}

@@ -340,7 +340,7 @@ export function PolicyStack() {
             Every purchase. Under control.
           </h2>
           <p className="pstack-sub">
-            From automatic approvals to blocked purchases and owner reviews, every decision follows your rules.
+            Approved, blocked or sent to the owner, by your rules.
           </p>
 
           <ul className="pstack-legend" aria-label="Choose an example">

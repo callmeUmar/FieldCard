@@ -1,5 +1,4 @@
-import { ArrowRight, Check } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Check } from 'lucide-react'
 import { BEATS, JOB_IMPACT } from './story'
 
 /** Copy blocks shared by the cinematic overlay and the static fallback. */
@@ -7,38 +6,11 @@ import { BEATS, JOB_IMPACT } from './story'
 export function HeroCopy({ beat = false }: { beat?: boolean }) {
   return (
     <div className="cine-hero" data-beat={beat ? 'hero' : undefined}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300/80">
-        DubHacks 2026 · Sandbox demo
-      </p>
-      <h1 className="mt-5 text-[2.6rem] font-semibold leading-[1.02] tracking-[-0.03em] text-white sm:text-5xl lg:text-[3.6rem]">
-        Field spend,
-        <br />
-        <span className="bg-gradient-to-r from-white via-indigo-100 to-[#a5b4fc] bg-clip-text text-transparent">
-          orchestrated by text.
-        </span>
-      </h1>
-      <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/65">
-        Workers request materials by text. Fieldcard handles spending rules, approvals, virtual cards,
-        and live job costing — without another app to install.
-      </p>
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Link
-          to="/live-demo"
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-400"
-        >
-          Try the interactive demo
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/10"
-        >
-          Open dashboard
-        </Link>
-      </div>
-      <p className="mt-6 text-xs text-white/40">
-        Simulated SMS and sandbox cards in demo mode — not live Visa authorization.
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f8ff7]">How it works</p>
+      <h2 className="mt-5 text-[2.6rem] font-semibold leading-[1.02] tracking-[-0.03em] text-white sm:text-5xl lg:text-[3.6rem]">
+        One text. One card.
+      </h2>
+      <p className="mt-5 text-lg text-white/60">Scroll to follow one purchase.</p>
     </div>
   )
 }
@@ -57,18 +29,6 @@ export function BeatCopy({ id, as: Heading = 'h2' }: { id: keyof typeof BEATS; a
         {b.body}
       </p>
     </>
-  )
-}
-
-export function LaunchDemoButton({ data = false }: { data?: boolean }) {
-  return (
-    <div data-part={data || undefined} className="cine-cta-row">
-      <Link to="/live-demo" className="cine-cta-button">
-        Try the interactive demo
-        <ArrowRight className="cine-cta-arrow h-4 w-4" />
-      </Link>
-      <span className="cine-mono-note">Sandbox simulation · no real payments</span>
-    </div>
   )
 }
 
@@ -194,9 +154,6 @@ export function PayoffChapter({ resolved = false, as: Heading = 'h2' }: { resolv
         <BeatCopy id="payoff" as={Heading} />
       </div>
       <JobImpactPanel resolved={resolved} />
-      <div className="cine-payoff-cta">
-        <LaunchDemoButton data />
-      </div>
     </div>
   )
 }
