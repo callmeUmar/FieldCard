@@ -6,3 +6,4 @@ google-genai
 requests
 python-dotenv
 pytest
+mongomock

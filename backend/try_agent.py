@@ -39,4 +39,6 @@ while True:
         image_url = parts[1] if len(parts) > 1 else None
         line = parts[2] if len(parts) > 2 else ""
 
-    print("fieldcard>", agent.handle_worker_message(worker, line, image_url))
+    reply = agent.handle_worker_message(worker, line, image_url)
+    if reply:
+        print("fieldcard>", reply)
