@@ -19,7 +19,7 @@ export function PolicyPage() {
       <div className="mx-auto max-w-md rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
         <p className="font-medium text-slate-900">Policy decision not found</p>
         <p className="mt-1 text-sm text-slate-500">It may have been cleared when the demo was reset.</p>
-        <Link to="/" className="mt-4 inline-block text-sm font-semibold text-indigo-600">
+        <Link to="/dashboard" className="mt-4 inline-block text-sm font-semibold text-indigo-600">
           Back to overview
         </Link>
       </div>

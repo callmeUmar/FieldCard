@@ -44,7 +44,7 @@ export function LandingPage() {
           <Link to="/live-demo" className="lx-nav-link hidden sm:inline-flex">
             Live demo
           </Link>
-          <Link to="/" className="lx-nav-pill">
+          <Link to="/dashboard" className="lx-nav-pill">
             Open dashboard
           </Link>
         </nav>
@@ -69,7 +69,7 @@ export function LandingPage() {
             <Link to="/live-demo" className="lx-footer-link">
               Live demo
             </Link>
-            <Link to="/" className="lx-footer-link">
+            <Link to="/dashboard" className="lx-footer-link">
               Dashboard
             </Link>
           </div>
