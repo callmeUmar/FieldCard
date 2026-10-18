@@ -124,11 +124,13 @@ class SimulatedPurchase(BaseModel):
 
 def _decline_text(reason: str | None, card: dict, req: dict) -> str:
     return {
-        "merchant_category_not_allowed": f"this card only works at {req['merchant']}",
+        "merchant_category_not_allowed": f"this card only works at {req.get('merchant', 'the approved store')}",
         "over_amount_cap": f"over the card's ${card['amount_cap_usd']:.2f} cap",
         "card_expired": "the card has expired",
         "card_used": "the card was already used",
         "card_terminated": "the card was cancelled",
+        # Reason text from cards.MockProvider:
+        "this card only works at the approved store type": f"this card only works at {req.get('merchant', 'the approved store')}",
     }.get(reason, reason or "declined by the card network")
 
 
@@ -149,32 +151,66 @@ def simulate_purchase(body: SimulatedPurchase):
     if worker is None:
         raise HTTPException(404, "Unknown worker")
 
-    card = mongo.cards.find_one({"worker_id": worker["_id"], "state": "active"})
+    # Newest active card, even if expired: the provider decides and records why.
+    card = mongo.cards.find_one({"worker_id": worker["_id"], "state": "active"}, sort=[("expires_at", -1)])
     if card is None:
-        return {"status": "declined", "reason": "no_active_card"}
+        return {"status": "declined", "result": "declined", "reason": "no_active_card", "decline_reason": "no_active_card"}
 
-    req = mongo.card_requests.find_one({"_id": card["request_id"]})
+    req = mongo.requests.find_one({"_id": card["request_id"]}) or {}
+    job_id = req.get("job_id")
     merchant = find_merchant(body.merchant_name)
-    mcc = merchant.get("mcc", "0000") if merchant else "0000"
+    merchant_name = merchant["name"] if merchant else body.merchant_name
+    mcc = merchant["mcc"] if merchant else "0000"  # unknown store: matches no card
 
-    # Evaluation check
-    reason = None
-    if card.get("expires_at") and card["expires_at"] < now():
-        reason = "card_expired"
-    elif card.get("used", False):
-        reason = "card_used"
-    elif body.amount > card.get("amount_cap_usd", 0):
-        reason = "over_amount_cap"
+    # The provider enforces the card's allowed MCCs, amount cap and expiry.
+    outcome = agent.provider.simulate_purchase(card["_id"], merchant_name, mcc, body.amount)
+    txn = {
+        "_id": new_id("txn"),
+        "card_id": card["_id"],
+        "job_id": job_id,
+        "merchant_name": merchant_name,
+        "mcc": mcc,
+        "amount_usd": body.amount,
+        "result": outcome["result"],
+        "decline_reason": outcome["decline_reason"],
+        "occurred_at": now(),
+    }
+    mongo.transactions.insert_one(txn)
+    _record_tiger(worker["company_id"], job_id, worker["_id"], body.amount, mcc, outcome["result"])
 
-    if reason:
-        _record_tiger(worker["company_id"], card.get("job_id"), worker["_id"], body.amount, mcc, "declined")
-        decline_msg = _decline_text(reason, card, req or {})
-        return {"status": "declined", "reason": reason, "message": decline_msg}
+    if outcome["result"] == "approved":
+        if job_id:
+            mongo.jobs.update_one({"_id": job_id}, {"$inc": {"spent_usd": body.amount}})
+        ir = mongo.intent_receipts.find_one_and_update(
+            {"request_id": card["request_id"]}, {"$push": {"transaction_ids": txn["_id"]}}, return_document=True
+        )
+        if ir is not None:
+            # Re-seal so the hash covers the new transaction.
+            mongo.intent_receipts.update_one({"_id": ir["_id"]}, {"$set": {"hash": agent.intent_hash(ir)}})
+        message = f"Approved ${body.amount:.2f} at {merchant_name}. Text me a photo of the receipt."
+        log_activity("purchase_approved", f"{worker['name']} spent ${body.amount:.2f} at {merchant_name}", job_id)
+    else:
+        reason = _decline_text(outcome["decline_reason"], card, req)
+        mongo.workers.update_one(
+            {"_id": worker["_id"]},
+            {"$set": {"offer": {"job_id": job_id, "merchant": merchant_name, "amount": body.amount}}},
+        )
+        message = f"Declined at {merchant_name}: {reason}. Reply YES to ask the owner for a card there."
+        log_activity(
+            "purchase_declined", f"{worker['name']} declined at {merchant_name} (${body.amount:.2f}): {reason}", job_id
+        )
+    messaging.send_text(worker["phone"], message)
 
-    # Successful authorization
-    mongo.cards.update_one({"_id": card["_id"]}, {"$set": {"used": True, "state": "used"}})
-    _record_tiger(worker["company_id"], card.get("job_id"), worker["_id"], body.amount, mcc, "approved")
-    return {"status": "approved", "card_id": card["_id"]}
+    # result/decline_reason per contracts.md (dashboard); status/reason/message kept from the previous version.
+    return {
+        "result": outcome["result"],
+        "decline_reason": outcome["decline_reason"],
+        "status": outcome["result"],
+        "reason": outcome["decline_reason"],
+        "message": message,
+        "transaction_id": txn["_id"],
+        "card_id": card["_id"],
+    }
 
 
 # ---------- VEYZL audit endpoint
