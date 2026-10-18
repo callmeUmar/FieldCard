@@ -111,3 +111,8 @@ def test_all_soft_reasons_collected():
     assert result.allowed is False
     assert result.needs_owner is True
     assert len(result.reasons) == 4
+
+
+@pytest.mark.parametrize("amount", [0, -50, float("nan"), float("inf"), "100"])
+def test_invalid_amount_denied(amount):
+    assert_hard_denied(run(make_job(), amount=amount), "positive dollar amount")

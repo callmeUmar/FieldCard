@@ -1,5 +1,6 @@
 """Spending policy. Pure code: the AI never decides whether spending is allowed."""
 
+import math
 from dataclasses import dataclass, field
 
 # Plumbing supply, hardware stores, electrical parts.
@@ -40,6 +41,10 @@ def check_policy(
             f"{worker.get('name', 'Worker')} already has an active card. "
             "Use or cancel it before requesting another."
         )
+
+    # NaN compares false against every limit and would slip through all of them.
+    if not isinstance(est_amount, (int, float)) or not math.isfinite(est_amount) or est_amount <= 0:
+        return _denied("The amount must be a positive dollar amount.")
 
     # Soft limits: the owner can approve these.
     reasons = []
