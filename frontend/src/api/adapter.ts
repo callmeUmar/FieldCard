@@ -253,6 +253,8 @@ export const fieldcardApi = {
     const spentBefore = job.spentCents
     txn.status = 'approved'
     job.spentCents += txn.amountCents
+    // Keep the company total in step with job spend, as approved purchases do
+    snapshot.metrics.totalMaterialSpendCents += txn.amountCents
 
     if (job.spentCents <= spentBefore) {
       throw new Error('Approval must increase job spend')

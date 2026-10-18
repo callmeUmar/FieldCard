@@ -8,12 +8,17 @@ export function VirtualCardDisplay({
   allowedMccs,
   issuedAt,
   expiresAt,
+  singleUse = true,
+  capBasis = 'Approved request amount (not worker max)',
 }: {
   lastFour: string
   spendLimitCents: number
   allowedMccs: string[]
   issuedAt: string
   expiresAt: string
+  /** Defaults match the Live Agent Demo card */
+  singleUse?: boolean
+  capBasis?: string
 }) {
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
@@ -50,7 +55,7 @@ export function VirtualCardDisplay({
             <span className="font-semibold text-white">{lastFour}</span>
           </p>
           <div className="mt-4 flex items-end justify-between gap-4">
-            <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-white/60">SINGLE-USE VIRTUAL</p>
+            <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-white/60">{singleUse ? 'SINGLE-USE VIRTUAL' : 'VIRTUAL · JOB CARD'}</p>
             <p className="text-right text-xs font-medium text-indigo-200/90">Simulation — not a live card</p>
           </div>
         </div>
@@ -77,7 +82,7 @@ export function VirtualCardDisplay({
         </div>
         <div className="col-span-2">
           <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Cap basis</dt>
-          <dd className="mt-1 text-slate-700">Approved request amount (not worker max)</dd>
+          <dd className="mt-1 text-slate-700">{capBasis}</dd>
         </div>
       </dl>
       <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">

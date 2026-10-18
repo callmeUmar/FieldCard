@@ -78,3 +78,49 @@ describe('fieldcardApi live demo financials', () => {
     expect(snap.workers[0].id).toBe('w_mike')
   })
 })
+
+describe('fieldcardApi spend consistency', () => {
+  const totals = async () => {
+    const snap = await fieldcardApi.getSnapshot()
+    const jobSpend = snap.jobs.reduce((sum, j) => sum + j.spentCents, 0)
+    const hen = snap.jobs.find((j) => j.id === 'job_henderson')!
+    return { metric: snap.metrics.totalMaterialSpendCents, jobSpend, hen, snap }
+  }
+
+  it('keeps totalMaterialSpendCents equal to job spend through the canonical sequence', async () => {
+    let t = await totals()
+    expect(t.metric).toBe(t.jobSpend)
+    expect(t.hen.spentCents).toBe(161_000)
+
+    // Live Demo: $186.50 Ferguson approved
+    await fieldcardApi.recordLiveAgentSetup()
+    await fieldcardApi.runLiveAgentPurchase('allowed')
+    t = await totals()
+    expect(t.hen.spentCents).toBe(179_650)
+    expect(t.hen.materialBudgetCents - t.hen.spentCents).toBe(60_350)
+    expect(t.metric).toBe(t.jobSpend)
+
+    // Owner approves the pending $275 Ferguson purchase
+    const pending = t.snap.transactions.find((x) => x.status === 'pending' && x.amountCents === 27_500)!
+    await fieldcardApi.approveTransaction(pending.id)
+    t = await totals()
+    expect(t.hen.spentCents).toBe(207_150)
+    expect(t.hen.materialBudgetCents - t.hen.spentCents).toBe(32_850)
+    expect(t.metric).toBe(t.jobSpend)
+
+    await fieldcardApi.resetDemo()
+    t = await totals()
+    expect(t.hen.spentCents).toBe(161_000)
+    expect(t.metric).toBe(initialSnapshot.metrics.totalMaterialSpendCents)
+    expect(t.metric).toBe(t.jobSpend)
+  })
+
+  it('leaves both job spend and the total untouched when the owner declines', async () => {
+    const before = await totals()
+    const pending = before.snap.transactions.find((x) => x.status === 'pending')!
+    await fieldcardApi.declineTransaction(pending.id)
+    const after = await totals()
+    expect(after.jobSpend).toBe(before.jobSpend)
+    expect(after.metric).toBe(before.metric)
+  })
+})

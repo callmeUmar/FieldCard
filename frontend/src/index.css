@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './styles/landing.css';
+@import './styles/app.css';
 
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
