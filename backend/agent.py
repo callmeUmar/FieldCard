@@ -125,7 +125,9 @@ def request_card_flow(worker, company, job_id, merchant_name, items, est, origin
     if merchant is None:
         return {"status": "denied", "reasons": [f"{merchant_name} is not a known store."]}
 
-    job = mongo.jobs.find_one({"_id": job_id})
+    # Scoped to the worker's company: another company's job is treated as
+    # missing, so nothing is written under it and its existence isn't revealed.
+    job = mongo.jobs.find_one({"_id": job_id, "company_id": worker["company_id"]})
     active_cards = list(
         mongo.cards.find({"worker_id": worker["_id"], "state": "active", "expires_at": {"$gt": now()}})
     )
@@ -143,7 +145,7 @@ def request_card_flow(worker, company, job_id, merchant_name, items, est, origin
         {
             "_id": req_id,
             "worker_id": worker["_id"],
-            "job_id": job_id,
+            "job_id": job["_id"] if job else None,
             "merchant": merchant["name"],
             "mcc": merchant["mcc"],
             "items": items,
