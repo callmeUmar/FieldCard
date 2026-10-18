@@ -9,7 +9,7 @@ import requests
 from fastapi import APIRouter, BackgroundTasks, Request, Response, status
 from pymongo.errors import DuplicateKeyError
 
-try:  # the same db module agent.py uses
+try:  # standard import setup matching agent.py
     from db import mongo, now
 except ImportError:
     from backend.db import mongo, now
@@ -135,4 +135,64 @@ def photon_send(to_phone: str, text: str) -> None:
     project_id = os.environ.get("PHOTON_PROJECT_ID", "")
 
     if project_id:
-        url = f"
+        url = f"https://api.photon.codes/v1/projects/{project_id}/messages"
+    else:
+        url = os.environ.get("PHOTON_API_URL", "https://api.photon.codes/v1/messages")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "to": to_phone,
+        "from": os.environ.get("PHOTON_PHONE_NUMBER"),
+        "text": text,
+        "platform": "sms",
+    }
+
+    response = requests.post(url, json=body, headers=headers, timeout=10)
+    print(f"[PHOTON OUTBOUND RESPONSE] Status: {response.status_code} | Body: {response.text}")
+    response.raise_for_status()
+
+
+def send_text(to_phone: str, text: str) -> None:
+    """Routes text via Photon or logs to dev outbox."""
+    if _suppressed.get():
+        print(f"[SMS suppressed (sandbox) -> {len(text)} chars]")
+        return
+    DEV_OUTBOX.append({"to": to_phone, "text": text})
+
+    # Check if MESSAGING environment variable is explicitly set to dev
+    if os.environ.get("MESSAGING") == "dev":
+        print(f"[DEV OUTBOX -> {to_phone}]: {text}")
+        return
+
+    try:
+        photon_send(to_phone, text)
+    except Exception as e:
+        print(f"[PHOTON ERROR]: Failed to send SMS to {to_phone}: {e}")
+
+
+@router.api_route("/photon", methods=["GET", "POST"])
+@router.api_route("/webhooks/photon", methods=["GET", "POST"])
+async def photon_webhook(request: Request, background: BackgroundTasks):
+    """
+    Photon webhook endpoint.
+    - GET: URL validation handshake.
+    - POST: Receives inbound texts, processes in the background, and logs.
+    """
+    if request.method == "GET":
+        return Response(
+            content='{"status": "ok", "message": "Photon webhook endpoint active"}',
+            status_code=status.HTTP_200_OK,
+            media_type="application/json",
+        )
+    if not _token_ok(request):
+        return Response(content='{"detail": "bad token"}', status_code=401, media_type="application/json")
+
+    raw = await request.body()
+    try:
+        payload = json.loads(raw or b"{}")
+    except ValueError:
+        payload = {"raw_body": raw.decode("utf-8", errors="ignore")}
+    print(f"[WEBHOOK RECEIVED]:
