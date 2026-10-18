@@ -50,6 +50,36 @@ def health():
     return {"ok": True, "time": now().isoformat(), "db": db_status}
 
 
+_gemini_check = {"at": 0.0, "result": None}
+
+
+@app.get("/health/gemini")
+def health_gemini():
+    """Is Gemini usable from this server? One tiny call, cached for 60s.
+    Reports the key's format (never its value), the model, and Google's error."""
+    import time as _time
+
+    if _gemini_check["result"] and _time.monotonic() - _gemini_check["at"] < 60:
+        return _gemini_check["result"]
+    key = os.getenv("GEMINI_API_KEY") or ""
+    key_format = None if not key else "AIza" if key.startswith("AIza") else "AQ." if key.startswith("AQ.") else "other"
+    result = {"configured": bool(key), "key_format": key_format, "model": agent.MODEL, "ok": False}
+    if agent.client is None:
+        result["error"] = "GEMINI_API_KEY is not set"
+    else:
+        try:
+            agent.client.models.generate_content(model=agent.MODEL, contents="Reply with OK.")
+            result["ok"] = True
+        except Exception as e:
+            details = getattr(e, "details", None) or {}
+            err = details.get("error", {}) if isinstance(details, dict) else {}
+            reasons = [d.get("reason") for d in err.get("details", []) if isinstance(d, dict) and d.get("reason")]
+            result["error"] = f"{getattr(e, 'code', '')} {getattr(e, 'status', '') or type(e).__name__}".strip()
+            result["reason"] = reasons[0] if reasons else (err.get("message") or str(e))[:200]
+    _gemini_check.update(at=_time.monotonic(), result=result)
+    return result
+
+
 class InboundMessage(BaseModel):
     from_phone: str
     text: str = ""
