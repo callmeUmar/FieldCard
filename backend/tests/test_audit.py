@@ -139,3 +139,8 @@ def test_falls_back_to_in_memory_db_when_mongo_unreachable(monkeypatch):
     assert mongo.workers.find_one({"_id": "w_veyzl"}) is None  # real DB untouched
     with in_memory():
         assert mongo.workers.find_one({"_id": "w_veyzl"}) is not None  # seeded and used in memory
+
+
+def test_audit_endpoint_is_off_unless_enabled(monkeypatch):
+    monkeypatch.delenv("AI_AUDIT_ENABLED")
+    assert client.post("/ai/audit", json={"prompt": "hi"}).status_code == 404

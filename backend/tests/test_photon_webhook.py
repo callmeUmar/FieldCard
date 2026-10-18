@@ -120,3 +120,93 @@ def test_token_required_when_configured(fresh, monkeypatch):
 def test_get_handshake_still_works():
     r = client.get("/webhooks/photon")
     assert r.status_code == 200 and r.json()["status"] == "ok"
+
+
+# ---------- Photon 2.0 (the real iMessage format, per https://api.photon.codes/openapi.json)
+
+LINE = "pho_usr_0aaaaaaaaaaaaaaaaaaaaaaaaa"
+SPACE = "pho_spc_0bbbbbbbbbbbbbbbbbbbbbbbbb"
+PROJECT = "pho_prj_0ccccccccccccccccccccccccc"
+
+
+def photon_event(text, *, msg_id="pho_msg_0ddddddddddddddddddddddddd", event_type="message.received",
+                 status="received", handle="+15550001111", content=None):
+    return {
+        "id": "pho_evt_0eeeeeeeeeeeeeeeeeeeeeeeee",
+        "type": event_type,
+        "apiVersion": "2026-07-01",
+        "source": "imessage.photon",
+        "timestamp": "2026-10-18T15:00:00Z",
+        "data": {
+            "projectId": PROJECT,
+            "object": {
+                "id": msg_id,
+                "platform": "imessage",
+                "status": status,
+                "projectId": PROJECT,
+                "sentBy": {"id": "pho_usr_0fffffffffffffffffffffffff", "handle": handle, "platform": "imessage", "kind": "person"},
+                "receivedBy": {"id": LINE, "handle": "+18885550000", "platform": "imessage", "kind": "line"},
+                "space": {"id": SPACE, "platform": "imessage", "kind": "direct", "participantIds": []},
+                "content": content or {"type": "text", "format": "plain", "text": text},
+            },
+        },
+    }
+
+
+class FakeResponse:
+    def __init__(self, status_code=202, text='{"id": "pho_msg_0sent"}'):
+        self.status_code, self.text = status_code, text
+
+
+@pytest.fixture
+def photon_api(monkeypatch):
+    """Real sending path (MESSAGING=photon) with Photon's HTTP API stubbed."""
+    sent = []
+    monkeypatch.setenv("MESSAGING", "photon")
+    monkeypatch.setenv("PHOTON_API_KEY", "pho_sk_test")
+    monkeypatch.setattr(messaging.requests, "post", lambda url, headers, json, timeout: sent.append((url, headers, json)) or FakeResponse())
+    return sent
+
+
+def test_imessage_text_reaches_gemini_and_reply_goes_back_into_the_conversation(fresh, photon_api):
+    assert post(photon_event("Elbows at Ferguson, $160"))[1] == {"status": "accepted"}
+    assert fresh == [("w_mike", "Elbows at Ferguson, $160", None)]
+    assert photon_api == [(
+        f"https://api.photon.codes/v1/projects/{PROJECT}/messages",
+        {"Authorization": "Bearer pho_sk_test"},
+        {"senderId": LINE, "spaceId": SPACE, "content": {"type": "text", "format": "plain", "text": "agent saw: Elbows at Ferguson, $160"}},
+    )]
+
+
+def test_conversation_is_remembered_for_later_messages(fresh, photon_api):
+    post(photon_event("hi"))
+    photon_api.clear()
+    messaging.send_text("(555) 000-1111", "Card ...1234 works at Ferguson up to $200.00 for 4 hours.")
+    assert [b["spaceId"] for _, _, b in photon_api] == [SPACE]  # matched by digits, sent into Mike's conversation
+
+
+@pytest.mark.parametrize("event_type,status", [
+    ("message.dispatched", "dispatched"),
+    ("message.delivered", "delivered"),
+    ("message.failed", "failed"),
+    ("message.received", "delivered"),  # defensive: a non-received object
+])
+def test_lifecycle_events_for_our_own_replies_are_ignored(fresh, photon_api, event_type, status):
+    assert post(photon_event("agent saw: hi", event_type=event_type, status=status))[1] == {"status": "ignored"}
+    assert fresh == [] and photon_api == []  # no loop: our reply is never treated as a new text
+
+
+def test_typing_updates_are_ignored(fresh, photon_api):
+    assert post(photon_event("", content={"type": "space.typing.update", "typing": True}))[1] == {"status": "ignored"}
+    assert fresh == []
+
+
+def test_cannot_message_someone_who_never_texted_the_line(fresh, photon_api):
+    assert messaging.photon_send("+15550009999", "approve?") is False
+    assert photon_api == []
+
+
+def test_photon_retry_of_the_same_message_is_handled_once(fresh, photon_api):
+    post(photon_event("hello", msg_id="pho_msg_0rrrrrrrrrrrrrrrrrrrrrrrrr"))
+    assert post(photon_event("hello", msg_id="pho_msg_0rrrrrrrrrrrrrrrrrrrrrrrrr"))[1] == {"status": "duplicate"}
+    assert len(fresh) == 1 and len(photon_api) == 1

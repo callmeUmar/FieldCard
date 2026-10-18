@@ -140,3 +140,20 @@ def test_overview_numbers_and_latest_card():
     assert (card["merchant"], card["job_name"], card["job_code"], card["amount_cap_usd"], card["state"]) == (
         "Ferguson", "Henderson Repipe", "HEN-01", 200, "used")
     assert 3.9 <= card["hours_left"] <= 4
+
+
+def test_health_gemini_reports_key_format_and_google_error(monkeypatch):
+    from google.genai import errors
+
+    class Models:
+        def generate_content(self, model, contents):
+            raise errors.ClientError(401, {"error": {"code": 401, "message": "API key not valid.", "status": "UNAUTHENTICATED",
+                                                     "details": [{"reason": "ACCESS_TOKEN_TYPE_UNSUPPORTED"}]}})
+
+    monkeypatch.setenv("GEMINI_API_KEY", "AQ.not-a-real-key")
+    monkeypatch.setattr(agent, "client", type("C", (), {"models": Models()})())
+    main._gemini_check["result"] = None
+    body = get("/health/gemini")
+    assert body["key_format"] == "AQ." and body["ok"] is False
+    assert body["error"] == "401 UNAUTHENTICATED" and body["reason"] == "ACCESS_TOKEN_TYPE_UNSUPPORTED"
+    assert "not-a-real-key" not in str(body)  # never leaks the key
