@@ -4,7 +4,7 @@ from google.genai import errors
 
 import agent
 import messaging
-import seed_dev
+import seed
 from db import mongo
 
 MIKE = "+15550001111"
@@ -40,7 +40,7 @@ FERGUSON_160 = {"job_id": "job_henderson", "merchant_name": "Ferguson", "items":
 def fresh_state(monkeypatch):
     for name in mongo.list_collection_names():
         mongo.drop_collection(name)
-    seed_dev.seed()
+    seed.seed()
     messaging.DEV_OUTBOX.clear()
     agent.chats.clear()
     monkeypatch.setattr(agent, "client", object())  # no real Gemini client needed
