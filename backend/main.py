@@ -766,6 +766,10 @@ def _audit(payload: dict) -> dict:
 
 @app.post("/ai/audit")
 async def ai_audit(request: Request):
+    # Built for the VEYZL audit, which isn't used. Off unless AI_AUDIT_ENABLED=1: it's a
+    # public Gemini endpoint, so leaving it open lets anyone spend the Gemini quota.
+    if os.getenv("AI_AUDIT_ENABLED") != "1":
+        raise HTTPException(404)
     try:
         payload = await request.json()
     except Exception:
