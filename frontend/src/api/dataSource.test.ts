@@ -79,7 +79,14 @@ describe('dashboardApi', () => {
     await expect(api.approveTransaction('req_2')).rejects.toThrow(/SMS/)
   })
 
-  it('reads the backend address from VITE_API_URL', async () => {
+  it('reads the backend address from NEXT_PUBLIC_API_URL', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.fieldcard.us')
+    stubFetch(() => json(dashboardFixture()))
+    await (await freshApi()).getSnapshot()
+    expect(calls[0].url).toBe('https://api.fieldcard.us/api/dashboard')
+  })
+
+  it('also accepts VITE_API_URL', async () => {
     vi.stubEnv('VITE_API_URL', 'https://staging.example.com/')
     stubFetch(() => json(dashboardFixture()))
     await (await freshApi()).getSnapshot()
