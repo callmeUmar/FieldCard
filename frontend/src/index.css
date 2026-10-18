@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+@import './styles/landing.css';
+@import './styles/app.css';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-surface: #f8fafc;
+  --color-sidebar: #0f172a;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-surface);
+  color: #0f172a;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.stagger-1 {
+  animation-delay: 50ms;
+}
+.stagger-2 {
+  animation-delay: 100ms;
+}
+.stagger-3 {
+  animation-delay: 150ms;
+}
+.stagger-4 {
+  animation-delay: 200ms;
+}
+
+/* Drawn check / cross (Live Demo policy rows and outcome) */
+.drawn-mark {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drawn-mark-ring {
+  stroke-width: 1.5;
+  opacity: 0.35;
+  stroke-dasharray: 1;
+  animation: drawn-mark 0.45s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.drawn-mark-stroke {
+  stroke-width: 2.2;
+  stroke-dasharray: 1;
+  animation: drawn-mark 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+}
+
+@keyframes drawn-mark {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-pulse-soft,
+  .drawn-mark-ring,
+  .drawn-mark-stroke {
+    animation: none !important;
+  }
+}

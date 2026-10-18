@@ -1,0 +1,407 @@
+/* "Every purchase. Under control." — interactive sandbox decision stack */
+
+.pstack {
+  --ps-approved: #34d399;
+  --ps-declined: #fb7185;
+  --ps-review: #fbbf24;
+  position: relative;
+  padding: 7rem 1.5rem 6rem;
+  /* continues the film's graphite; a faint indigo key light behind the stack */
+  background:
+    radial-gradient(ellipse 45% 55% at 72% 55%, rgba(99, 102, 241, 0.08), transparent 70%),
+    #060709;
+}
+
+.pstack-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 4rem;
+  align-items: center;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.pstack-sub {
+  max-width: 28rem;
+  margin-top: 1.25rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: rgba(236, 239, 244, 0.6);
+}
+
+/* ---------- Legend (also a keyboard / touch picker) ---------- */
+
+.pstack-legend {
+  display: grid;
+  gap: 0.5rem;
+  margin: 2.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pstack-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: inherit;
+  text-align: left;
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.pstack-legend-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.pstack-legend-item[aria-pressed='true'] {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.pstack-legend-item:focus-visible,
+.pstack-hit:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 4px;
+}
+
+.pstack-legend-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  color: var(--ps-c);
+  background: color-mix(in srgb, var(--ps-c) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-c) 35%, transparent);
+}
+
+.pstack-legend-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.pstack-legend-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f5f6f8;
+}
+
+.pstack-legend-summary {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+[data-status='approved'] {
+  --ps-c: var(--ps-approved);
+}
+[data-status='declined'] {
+  --ps-c: var(--ps-declined);
+}
+[data-status='review'] {
+  --ps-c: var(--ps-review);
+}
+
+/* ---------- Stage ---------- */
+
+.pstack-demo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pstack-stage {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  padding: 34px 0 92px; /* room for the lift above and the fanned cards below */
+  perspective: 1200px;
+}
+
+.pstack-tilt {
+  position: relative;
+  transform-style: flat;
+}
+
+.pstack-hit {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.62;
+  border-radius: 22px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pstack-ground {
+  position: absolute;
+  right: 8%;
+  bottom: 30px;
+  left: 8%;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.75), transparent);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/* ---------- Card ---------- */
+
+.pstack-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1.375rem 1.125rem;
+  overflow: hidden;
+  border-radius: 22px;
+  color: #eef0f4;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  background:
+    radial-gradient(ellipse 70% 60% at 100% 0%, color-mix(in srgb, var(--ps-c) 13%, transparent), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px),
+    linear-gradient(140deg, #24262d 0%, #15161b 55%, #1a1a24 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 18px 36px -18px rgba(0, 0, 0, 0.8),
+    0 40px 70px -40px rgba(0, 0, 0, 0.9);
+  transform-origin: 50% 100%;
+  backface-visibility: hidden;
+}
+
+/* depth: cards further back sit in shade */
+.pstack-card-shade {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #050608;
+  opacity: var(--shade, 0);
+  pointer-events: none;
+}
+
+.pstack-card-accent {
+  position: absolute;
+  top: 0;
+  right: 1.375rem;
+  left: 1.375rem;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--ps-c);
+  opacity: 0.85;
+}
+
+.pstack-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pstack-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.pstack-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #8d8ffa, #4f46e5);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.pstack-sandbox {
+  padding: 4px 8px;
+  border: 1px solid rgba(253, 230, 138, 0.45);
+  border-radius: 9999px;
+  background: rgba(253, 230, 138, 0.07);
+  color: #fde68a;
+  font: 600 9px/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.pstack-merchant {
+  margin-top: auto;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.pstack-amount {
+  margin-top: 0.125rem;
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.pstack-job {
+  margin-top: 0.375rem;
+  font: 600 10.5px/1.4 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.pstack-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.pstack-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 5px 10px 5px 8px;
+  border-radius: 9999px;
+  color: var(--ps-c);
+  background: color-mix(in srgb, var(--ps-c) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-c) 32%, transparent);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.pstack-reason {
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* ---------- Hint ---------- */
+
+.pstack-hint {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: -0.25rem;
+  font: 600 10px/1.4 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.pstack-count {
+  white-space: nowrap;
+  padding-left: 1rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.pstack-hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .pstack-hint-hover {
+    display: none;
+  }
+  .pstack-hint-touch {
+    display: inline;
+  }
+}
+
+/* ---------- Mobile: copy, then stack, then the picker ---------- */
+
+@media (max-width: 860px) {
+  .pstack {
+    padding: 5rem 1.25rem 4rem;
+  }
+
+  .pstack-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+
+  .pstack-copy {
+    display: contents;
+  }
+
+  .pstack-copy > .landing-kicker,
+  .pstack-copy > .landing-h2,
+  .pstack-sub {
+    grid-column: 1;
+  }
+
+  .pstack-demo {
+    order: 4;
+  }
+
+  .pstack-legend {
+    order: 5;
+    margin-top: 0;
+  }
+
+  .pstack-stage {
+    max-width: 360px;
+    padding: 24px 0 66px;
+  }
+}
+
+@media (max-width: 420px) {
+  .pstack-card {
+    padding: 1rem 1.125rem 0.875rem;
+  }
+
+  .pstack-amount {
+    font-size: 34px;
+  }
+
+  .pstack-reason {
+    font-size: 12px;
+  }
+
+  .pstack-legend-summary {
+    display: none;
+  }
+
+  .pstack-legend {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.375rem;
+  }
+
+  .pstack-legend-item {
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.625rem 0.25rem;
+    text-align: center;
+  }
+
+  .pstack-legend-text {
+    align-items: center;
+  }
+
+  .pstack-legend-label {
+    font-size: 0.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pstack-legend-item {
+    transition: none;
+  }
+}
