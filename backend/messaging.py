@@ -1,11 +1,18 @@
+import contextvars
 import hmac
 import json
 import os
-import requests
-import contextvars
 from contextlib import contextmanager
-from fastapi import APIRouter, Request, Response, status
-from pymongo import MongoClient
+from typing import Callable
+
+import requests
+from fastapi import APIRouter, BackgroundTasks, Request, Response, status
+from pymongo.errors import DuplicateKeyError
+
+try:  # the same db module agent.py uses
+    from db import mongo, now
+except ImportError:
+    from backend.db import mongo, now
 
 router = APIRouter()
 
@@ -116,21 +123,6 @@ def suppressed():
         _suppressed.reset(token)
 
 
-def parse_inbound(payload: dict) -> dict:
-    """Extracts standard fields from Photon webhook payloads."""
-    media = payload.get("media") or payload.get("mediaUrl") or []
-    if isinstance(media, str):
-        media_url = media
-    else:
-        media_url = media[0] if media else None
-
-    return {
-        "from_phone": payload.get("from") or payload.get("sender"),
-        "text": payload.get("text") or payload.get("body") or "",
-        "image_url": media_url
-    }
-
-
 def photon_send(to_phone: str, text: str) -> None:
     """Sends outbound SMS using Photon API."""
     api_key = os.environ.get("PHOTON_API_KEY")
@@ -176,59 +168,41 @@ def send_text(to_phone: str, text: str) -> None:
 
 
 @router.api_route("/webhooks/photon", methods=["GET", "POST"])
-async def photon_webhook(request: Request):
+async def photon_webhook(request: Request, background: BackgroundTasks):
     """
-    Handles Photon Webhook requests.
-    - GET: Required for Photon's URL validation handshake.
-    - POST: Receives incoming message events, logs them, routes them to Gemini, and replies.
+    Photon webhook.
+    - GET: URL validation handshake.
+    - POST: an inbound text. Answered right away; the message is routed to the
+      owner flow or the Gemini agent in the background and the reply is texted back.
     """
-    # 1. Validation Handshake (GET)
     if request.method == "GET":
         return Response(
             content='{"status": "ok", "message": "Photon webhook endpoint active"}',
             status_code=status.HTTP_200_OK,
-            media_type="application/json"
+            media_type="application/json",
         )
+    if not _token_ok(request):
+        return Response(content='{"detail": "bad token"}', status_code=401, media_type="application/json")
 
-    # 2. Incoming Event Payload (POST)
+    raw = await request.body()
     try:
-        payload = await request.json()
-    except Exception:
-        body_bytes = await request.body()
-        payload = {"raw_body": body_bytes.decode("utf-8", errors="ignore")}
-
+        payload = json.loads(raw or b"{}")
+    except ValueError:
+        payload = {"raw_body": raw.decode("utf-8", errors="ignore")}
     print(f"[WEBHOOK RECEIVED]: {payload}")
 
-    # Log payload to MongoDB if connection exists
-    if db is not None:
-        try:
-            db.messaging_logs.insert_one({
-                "source": "photon",
-                "payload": payload,
-                "timestamp": request.headers.get("x-request-timestamp") or os.environ.get("BUILD_TIME")
-            })
-        except Exception as err:
-            print(f"Failed to log message to MongoDB: {err}")
+    msg = parse_inbound(payload)
+    log = {"source": "photon", "payload": payload, "received_at": now(), "parsed": msg}
+    if msg and msg["id"]:
+        log["_id"] = f"photon_{msg['id']}"  # Photon may retry: handle each message once
+    if not _log(log):
+        return {"status": "duplicate"}
+    if msg is None:
+        return {"status": "ignored"}
+    if _inbound_handler is None:
+        print("[photon] no inbound handler registered; message logged only")
+        return {"status": "logged"}
 
-    # 3. Parse and Route to Gemini Agent
-    parsed = parse_inbound(payload)
-    from_phone = parsed.get("from_phone")
-    incoming_text = parsed.get("text")
-    image_url = parsed.get("image_url")
-
-    if from_phone and (incoming_text or image_url):
-        # Lazy import route_message from main to avoid circular imports
-        try:
-            from main import route_message
-            reply = route_message(from_phone, incoming_text, image_url)
-            print(f"[AGENT REPLY]: {reply}")
-            if reply:
-                send_text(from_phone, reply)
-        except Exception as e:
-            print(f"[WEBHOOK EXECUTION ERROR]: {e}")
-
-    return {
-        "status": "success",
-        "received": True,
-        "data": payload
-    }
+    print(f"[photon] inbound from {msg['from_phone'][-4:]}: {len(msg['text'])} chars, image={bool(msg['image_url'])}")
+    background.add_task(_inbound_handler, msg)
+    return {"status": "accepted"}
