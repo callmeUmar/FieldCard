@@ -1,25 +1,48 @@
+import base64
 import os
+import re
+import threading
+import time
+import traceback
+from contextlib import asynccontextmanager, nullcontext
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from pydantic import BaseModel
 from pymongo import MongoClient
+from starlette.concurrency import run_in_threadpool
 
 # Safe fallback imports for Render & local execution
 try:
-    from backend import agent, messaging
+    from backend import agent, guardrails, messaging, seed
     from backend.db import find_merchant, log_activity, mongo, new_id, now
     from backend.messaging import router as messaging_router
 except ImportError:
     import agent
+    import guardrails
     import messaging
+    import seed
     from db import find_merchant, log_activity, mongo, new_id, now
     from messaging import router as messaging_router
 
 YES_WORDS = {"YES", "Y"}
 DEMO_WORKER_ID = "w_mike"
 
-app = FastAPI(title="Fieldcard")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan event handler.
+    Registers the inbound SMS handler when the server boots up.
+    """
+    messaging.on_inbound(handle_inbound_sms)
+    print("[MAIN] Inbound SMS handler registered successfully.")
+    yield
+
+
+app = FastAPI(title="Fieldcard", lifespan=lifespan)
 
 # The dashboard is served from another origin (e.g. Vercel), so browsers need CORS.
 app.add_middleware(
@@ -29,10 +52,16 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-# Register the messaging router so /webhooks/photon is served
+# Register the messaging router so /webhooks/photon and /photon are served
 app.include_router(messaging_router)
 
 _health_client = None
+
+
+@app.get("/")
+def read_root():
+    """Root endpoint for Render health checks and ping requests."""
+    return {"status": "ok", "service": "Fieldcard Backend"}
 
 
 @app.get("/health")
@@ -45,6 +74,7 @@ def health():
         db_status = "ok"
     except Exception as e:
         print(f"[health] MongoDB ping failed: {type(e).__name__}")
+        _health_client = None
         db_status = "error"
     return {"ok": True, "time": now().isoformat(), "db": db_status}
 
@@ -246,8 +276,6 @@ def simulate_purchase(body: SimulatedPurchase):
 
 
 # ---------- Dashboard read API (read-only)
-import re  # noqa: E402
-
 DEMO_COMPANY_ID = os.getenv("DEMO_COMPANY_ID", "co_ballard")
 SANDBOX_PHONE_PREFIX = "sandbox:"
 READ_LIMIT = 200
@@ -550,23 +578,6 @@ def dev_request_card(body: DemoCardRequest):
 
 
 # ---------- VEYZL audit endpoint
-import base64  # noqa: E402
-import threading  # noqa: E402
-import time  # noqa: E402
-import traceback  # noqa: E402
-from contextlib import nullcontext  # noqa: E402
-
-from fastapi import Request  # noqa: E402
-from google.genai import errors as genai_errors  # noqa: E402
-from google.genai import types as genai_types  # noqa: E402
-from starlette.concurrency import run_in_threadpool  # noqa: E402
-
-try:
-    from backend import guardrails, seed
-except ImportError:
-    import guardrails
-    import seed
-
 AUDIT_WORKER = {
     "_id": "w_veyzl",
     "company_id": "co_ballard",
